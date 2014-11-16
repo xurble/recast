@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-sm-12">
+            <img class="pull-right feed-art" src="{{subscription.source.image_url}}" alt="Logo">
+            <h2>{{subscription.source.name}}</h2>
+            <p><a href="{{subscription.source.site_url}}">Show Homepage</a> - <a href="/feed/{{subscription.key}}/">Recast Link</a></p>
+
+            <p>This recast is updated every {{subscription.frequency}} days.  The next episode will drop <span id="countdown-holder">{{subscription.next_send_date}} (GMT)</span>.</p>
+        
+            <br>
+            <form method="POST">
+                <input type="submit" name="release" value="Release Next Episode" class="btn btn-primary btn-sm">
+            </form>
+            <hr>
+            <h3>Frequency</h3>
+            <form method="POST">
+                <label for="frequency">New episodes every</label>
+                    <select name="frequency" id="frequency">
+                        {% for d in days %}
+                            <option value="{{d}}" {% if d == subscription.frequency %}selected{% endif %}>{{d}}</option>
+                        {% endfor %}
+                </select>
+                <label for="frequency">days.</label>
+                <input type="submit" value="Update Frequency" class="btn btn-sm btn-primary">
+            </form>
+            <hr>
+            <h3>Episodes</h3>
+        
+            <table class="episode-list">
+                {% for e in episodes %}
+                    <tr 
+                        {% if e.index <  subscription.last_sent %}class="old"{% endif %}
+                        {% if e.index == subscription.last_sent %}class="current"{% endif %}
+            
+            
+                    ><td>{{e.index}}</td><td>{{e.title}}</td><td>{{e.created|date}}</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</div>
+
+
+
+
+{% endblock %}

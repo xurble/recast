@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+    <!-- Main jumbotron for a primary marketing message or call to action -->
+    <div class="jumbotron">
+      <div class="container">
+        <h1>What is Recast?</h1>
+        <p>Recast drip feeds your podcast player all the episodes of a podcast, one by one until you have caught up.</p>
+        <p>No sign-up or registration required.  Just put in a podcast show page or feed url, and get a Recast feed link back.</p>
+      </div>
+    </div>
+
+    <div class="container">
+    
+        <div class="row">
+        
+            <div class="col-sm-12">
+        
+                <form method="post" onsubmit="addFeed(0); return false;" name="addfeed">
+        
+                    <label for="feed-0">Enter the address of a show to get started:</label><br>
+        
+                    <input type="url" id="feed-0" name="feed" value="{{feed}}" placeholder="Enter show or feed address" class="feedsource">
+        
+                    <input type="submit" value="Get Recast Link" class="btn btn-primary getbtn">
+                    {% csrf_token %}
+                </form>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-12" id="working" style="display:none">
+                <h2>Working</h2>
+                <img src='/static/images/loader.gif' alt='Loading' width='32'>
+                </div>
+            <div id="addresult" class="col-sm-12" style="display:none"> 
+                <h2>Feeds</h2>
+                <ul id="addfeedlist">
+                </ul>
+            </div>
+        
+            <div class="col-sm-12" id="popular">
+                <h2>Popular Recasts</h2>
+                <p>Feeds that other people are recasting.</p>
+                <ul class="existing-feedlist">
+                    {% for f in popular %}
+        
+                        <li>
+                            <a title="{{f.displayName}}" href="{{f.bestLink }}"><img src="{{f.image_url}}" alt="{{f.dispalyName}}"></a>
+                            <form method="post" onsubmit="return false;">
+                                <input type="hidden" name="feed" id="feed-s{{f.id}}" value="{{f.feed_url}}">
+                                <a href="#" onclick="addFeed('s{{f.id}}')" class="btn btn-success btn-sm" style="margin:3px;">Get Link</a>
+                            </form>
+                        </li>
+        
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+<script>
+
+function addFeed(fid)
+{
+	var theFeed = $("#feed-" + fid).val();
+	if (theFeed == '')
+	{
+		return;
+	}
+	$("#popular").fadeOut(function(){
+        $("#addresult").fadeOut(function(){
+    
+            $("#working").fadeIn(function(){
+    
+                $.post("/addfeed/", { feed:theFeed }, function(data){
+    
+                    $("#working").fadeOut(function(){
+                        $("#addresult").html(data).fadeIn();
+                    });
+    
+                },'html');
+    
+            });
+        });
+	});
+	
+	
+	
+}
+
+</script>
+
+
+{% endblock %}

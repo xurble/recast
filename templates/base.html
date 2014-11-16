@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Recast - The simple podcast rebroadcaster</title>
+		
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">		
+ 		<script type="text/javascript" src="/static/js/jquery-1.11.1.js"></script>
+
+
+		<link href="/static/css/bootstrap.min.css" rel="stylesheet"	type="text/css">
+		<link href="/static/css/recast.css" rel="stylesheet" type="text/css">
+		
+		<link rel="shortcut icon" href="/static/images/recast-small.png">
+        <link rel="apple-touch-icon" href="/static/images/touch.png">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+ 
+        {% block head %}
+        
+        
+        
+        {% endblock %}
+	</head>
+	<body>
+
+        <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+          <div class="container">
+          <a class="navbar-brand" href="/">
+              <img src="/static/images/logo-trans.png" style="max-height:32px;margin-top:-6px;">
+          </a>
+          <p class="navbar-text" style="width:90%">
+           <a href="/" class="navbar-link logo">Recast</a>
+           <a href="/help/" class="navbar-link" style="float:right">Help</a>
+          </p>
+          </div>
+        </nav>
+
+
+
+
+        {% block content %}
+
+        {% endblock %}
+        <script>
+
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+                // Only send the token to relative URLs i.e. locally.
+                xhr.setRequestHeader("X-CSRFToken",
+                                     $("input[name='csrfmiddlewaretoken']")[0].value);
+            }
+        }
+    });
+
+        </script>
+	</body>
+</html>

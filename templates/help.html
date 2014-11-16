@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+    <div class="container">
+        <div class="row">
+            <div class="col-sm-12">
+
+            	<h2>Why Recast?</h2>
+            	
+                <p>Recast is designed to make it convenient to listen to all the old episodes of a podcast from the beginning.</p>
+                
+                <p>Most podcast clients will only automatically present the latest episode of a podcast and leave you to manually download previous episodes one by one, eliminating
+                    the convenience of automatic delivery.</p>
+                
+
+
+                <h2>How does it work?</h2>
+                
+                <p>Instead of subscribing directly to the podcast, you give Recast the address of the website or feed of the podcast and it will return you a unique, personalized feed.
+                    Simply subscribe to the Recast feed instead.</p>
+                
+                <p>By default Recast will feed you a new episode of the podcast every five days - enough to slowly catch up with most weekly podcasts.  At any time, you can change 
+                the frequency new episodes are released, or just release the next episode.</p>
+                
+
+
+            	<h2>Bookmarklet</h2>
+            	
+                <p>This bookmarklet will pass the address of the current address any page you are on to Recast.  Use it quickly and easily get a Recast link for a podcast you are 
+                interested in.</p>
+                
+                <p>Simply drag this button onto your bookmark bar:
+                    
+                    <a class="btn btn-primary btn-sm" href="javascript:document.location.href='http://recastthis.com/?feed=' + encodeURIComponent(document.location.href);">Recast This</a>
+                </p>
+                
+            	
+            	<p><a href="http://www.howtogeek.com/189358/beginner-geek-how-to-use-bookmarklets-on-any-device/">Find out more about bookmarklets</a>.</p>
+            	
+            	
+            	
+            	<h2>Find out More</h2>
+            	
+            	<p>Recast is a free project that I created because I couldn't find anything similar and I really wanted to listen to <a href="http://commonplacebooks.com/welcome-to-night-vale">Welcome Night Vale</a> from the start</p>
+            	
+            	<p>Recast is open source.  If there's something you want it to do that it currently doesn't, you can get the source code Github, if that sort of thing means anything to you.</p>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
