@@ -41,7 +41,7 @@ def index(request):
     if "feed" in request.GET:
         vals["feed"] = request.GET["feed"]
 
-    vals["popular"] = Source.objects.all().order_by("-num_subs")[:10]
+    vals["popular"] = Source.objects.all().order_by("-num_subs")[:8]
 
     return render_to_response("index.html",vals,context_instance=RequestContext(request))
 
@@ -568,27 +568,31 @@ def importFeed(source,feedBody,response=None):
         except Exception as ex:
             p.author = ""
         
-        for ee in list(p.enclosure_set.all()):
-            # check existing enclosure is still there
-            found_enclosure = False
+        try:
+            for ee in list(p.enclosure_set.all()):
+                # check existing enclosure is still there
+                found_enclosure = False
+                for pe in e["enclosures"]:
+                    if pe["href"] == ee.href:
+                        found_enclosure = True
+                        pe["href"] = "X" # don't re-add in hte second pass
+                        ee.length = int(pe["length"])
+                        ee.type = pe["type"]
+                        ee.save()
+                        break
+                if not found_enclosure:
+                    ee.delete()
+    
             for pe in e["enclosures"]:
-                if pe["href"] == ee.href:
-                    found_enclosure = True
-                    pe["href"] = "X" # don't re-add in hte second pass
-                    ee.length = int(pe["length"])
-                    ee.type = pe["type"]
-                    ee.save()
-                    break
-            if not found_enclosure:
-                ee.delete()
-
-        for pe in e["enclosures"]:
-            try:
-                if pe["href"] != "X":
-                    ee = Enclosure(post = p , href = pe["href"], length = int(pe["length"]), type = pe["type"])
-                    ee.save()
-            except Exception as ex:
-                pass
+                try:
+                    if pe["href"] != "X":
+                        ee = Enclosure(post = p , href = pe["href"], length = int(pe["length"]), type = pe["type"])
+                        ee.save()
+                except Exception as ex:
+                    pass
+        except:
+            if response:
+                response.write("No enclosures")
 
         try:
             p.body = body                       
