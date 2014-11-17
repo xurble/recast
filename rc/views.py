@@ -461,6 +461,7 @@ def reader(request):
 
 def importFeed(source,feedBody,response=None):
 
+
     changed = False
 
     #response.write(ret.content)           
@@ -514,14 +515,16 @@ def importFeed(source,feedBody,response=None):
                 guid = m.hexdigest()
                     
         try:
-            p  = Post.objects.filter(source=s).filter(guid=guid)[0]
+            p  = Post.objects.filter(source=source).filter(guid=guid)[0]
             if response: response.write("EXISTING " + guid + "\n")
 
         except Exception as ex:
+            print ex
             if response: response.write("NEW " + guid + "\n")
             p = Post(index=0)
             p.found = datetime.datetime.utcnow()
             p.created = datetime.datetime.utcnow()
+            p.guid = guid
             changed = True
             p.source = source
             p.save()
@@ -555,7 +558,6 @@ def importFeed(source,feedBody,response=None):
         
         # response.write("CC %s \n" % str(p.created))
         
-        p.guid = guid
         try:
             p.author = e.author
         except Exception as ex:
