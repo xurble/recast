@@ -21,6 +21,9 @@ urlpatterns = patterns('',
     (r'^help/$', 'rc.views.help'),
 
     (r'^feed/(?P<key>.*)/edit/$','rc.views.editfeed'),
+
+
+    (r'^feed/(?P<fid>.*)/revive/$','rc.views.revivefeed'),
     
     (r'^feed/(?P<key>.*)/$','rc.views.feed'),
 
@@ -30,18 +33,19 @@ urlpatterns = patterns('',
 
 
     (r'^addfeed/$', 'rc.views.addfeed'),
-    
-    ('^robots.txt$', 'rc.views.robots'),
+
+    (r'^feedgarden/$', 'rc.views.feedgarden'),
 
     
-    
+
+    ('^robots.txt$', 'rc.views.robots'),
+
     
 )
 
 """
     (r'^allfeeds/$', 'rc.views.allfeeds'),
     (r'^importopml/$', 'rc.views.importopml'),
-    (r'^feedgarden/$', 'rc.views.feedgarden'),
     (r'^accounts/login','rc.views.loginpage'),
     (r'^read/(?P<fid>.*)/(?P<qty>.*)/','rc.views.readfeed'),
 
@@ -53,6 +57,5 @@ urlpatterns = patterns('',
     (r'^subscription/(?P<sid>.*)/addto/(?P<tid>.*)/$','rc.views.addto'),
 
 
-    (r'^feed/(?P<fid>.*)/revive/$','rc.views.revivefeed'),
     (r'^feed/(?P<fid>.*)/kill/$','rc.views.killfeed'),
 """

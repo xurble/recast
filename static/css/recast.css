@@ -142,6 +142,7 @@ table.episode-list tr.current {
 #gardentable, #gardentable td,#gardentable th {
 	border:1px solid #CCC;
 	border-collapse: collapse;
+	padding:3px;
 }
 
 

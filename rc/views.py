@@ -155,8 +155,30 @@ def enclosure_redirect(request,eid):
     enc = get_object_or_404(Enclosure,id=int(eid))
     
     return HttpResponseRedirect(enc.href)
-    
 
+
+@login_required
+def feedgarden(request):
+    vals = {}
+    vals["feeds"] = Source.objects.all().order_by("due_poll")
+    return render_to_response('feedgarden.html',vals,context_instance=RequestContext(request))
+    
+@login_required
+def revivefeed(request,fid):
+
+    if request.method == "POST":
+        
+        f = get_object_or_404(Source,id=int(fid))
+        f.live = True
+        f.due_poll = datetime.datetime.utcnow()
+        f.etag = None
+        f.last_modified = None
+        # f.lastSuccess = None
+        # f.lastChange = None
+        # f.maxIndex = 0
+        f.save()
+        # Post.objects.filter(source=f).delete()
+        return HttpResponse("OK")
 
 def addfeed(request):
 
@@ -165,8 +187,12 @@ def addfeed(request):
         if request.method == "POST":
     
             feed = request.POST["feed"]
+            
+            if request.META["HTTP_HOST"] in feed:
+                return HttpResponse("<h2>Subscription Error</h2>You cannot recast a Recast feed!")
+                
         
-            headers = { "User-Agent": "Recast/1.0", "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
+            headers = { "User-Agent": "Recast/1.0 (+http://%s; Initial Feed Crawler)" % request.META["HTTP_HOST"], "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
 
             ret = requests.get(feed, headers=headers)
             #can I be bothered to check return codes here?  I think not on balance
@@ -299,7 +325,7 @@ def reader(request):
     
         interval = s.interval
     
-        headers = { "User-Agent": "Recast/1.0 at %s (%d subscribers)" % (request.META["HTTP_HOST"],s.num_subs), "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
+        headers = { "User-Agent": "Recast/1.0 (+http://%s; Updater; %d subscribers)" % (request.META["HTTP_HOST"],s.num_subs), "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
         if s.etag:
             headers["If-None-Match"] = str(s.etag)
         if s.last_modified:

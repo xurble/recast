@@ -10,3 +10,8 @@ Most podcast clients will only automatically present the latest episode of a pod
 Instead of subscribing directly to the podcast, you give Recast the address of the website or feed of the podcast and it will return you a unique, personalized feed. Simply subscribe to the Recast feed instead.
 
 By default Recast will feed you a new episode of the podcast every five days - enough to slowly catch up with most weekly podcasts. At any time, you can change the frequency new episodes are released, or just release the next episode.
+
+Installation
+============
+
+Recast is a pretty simple django (1.4 - sorry)

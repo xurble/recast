@@ -70,6 +70,12 @@
         }
     });
 
+    function imgError(image) {
+        image.onerror = "";
+        image.src = "/static/images/recast-large.png";
+        return true;
+    }
+
         </script>
 	</body>
 </html>
