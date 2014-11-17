@@ -23,7 +23,8 @@ urlpatterns = patterns('',
     (r'^feed/(?P<key>.*)/edit/$','rc.views.editfeed'),
 
 
-    (r'^feed/(?P<fid>.*)/revive/$','rc.views.revivefeed'),
+    (r'^source/(?P<sid>.*)/revive/$','rc.views.revivesource'),
+    (r'^source/(?P<sid>.*)/$','rc.views.source'),
     
     (r'^feed/(?P<key>.*)/$','rc.views.feed'),
 

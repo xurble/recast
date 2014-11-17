@@ -138,6 +138,12 @@ table.episode-list tr.current {
     background-color: #90a7db
 }
 
+td.ua {
+    font-size:8px;
+    border-bottom: 1px solid #ccc;
+    
+}
+
 
 #gardentable, #gardentable td,#gardentable th {
 	border:1px solid #CCC;

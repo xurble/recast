@@ -65,7 +65,7 @@ class Source(models.Model):
         elif self.last_change == None or self.last_success == None:
             css="background-color:#D00;color:white"
         else:
-            dd = datetime.datetime.utcnow().replace(tzinfo=utc) - self.last_change
+            dd = datetime.datetime.utcnow() - self.last_change
             
             days = int (dd.days/2)
             
@@ -85,7 +85,7 @@ class Source(models.Model):
         elif self.last_change == None or self.last_success == None:
             css="#F00;"
         else:
-            dd = datetime.datetime.utcnow().replace(tzinfo=utc) - self.last_change
+            dd = datetime.datetime.utcnow() - self.last_change
             
             days = int (dd.days/2)
             
@@ -131,6 +131,8 @@ class Subscription(models.Model):
         return roll_date
                 
                 
+    class Meta:
+        ordering = ["-last_sent"]
     
                 
 class Post(models.Model):
@@ -176,6 +178,10 @@ class Post(models.Model):
     
     def __unicode__(self):
         return "%s: post %d, %s" % (self.source.displayName(),self.index,self.title)
+
+    class Meta:
+        ordering = ["index"]
+
         
 class Enclosure(models.Model):
     post   = models.ForeignKey(Post)
@@ -209,3 +215,6 @@ class AccessLog(models.Model):
             return "%d @ %s - %s from %s -- %s" % (self.return_code, self.access_time,self.subscription.name,self.ip_address,self.user_agent)
         else:
             return "%d @ %s from %s -- %s" % (self.return_code, self.access_time,self.ip_address,self.user_agent)
+            
+    class Meta:
+        ordering = ["-id"]

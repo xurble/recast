@@ -164,21 +164,25 @@ def feedgarden(request):
     return render_to_response('feedgarden.html',vals,context_instance=RequestContext(request))
     
 @login_required
-def revivefeed(request,fid):
+def revivesource(request,sid):
 
     if request.method == "POST":
         
-        f = get_object_or_404(Source,id=int(fid))
-        f.live = True
-        f.due_poll = datetime.datetime.utcnow()
-        f.etag = None
-        f.last_modified = None
-        # f.lastSuccess = None
-        # f.lastChange = None
-        # f.maxIndex = 0
-        f.save()
-        # Post.objects.filter(source=f).delete()
+        s = get_object_or_404(Source,id=int(sid))
+        s.live = True
+        s.due_poll = datetime.datetime.utcnow()
+        s.etag = None
+        s.last_modified = None
+        s.save()
         return HttpResponse("OK")
+        
+@login_required
+def source(request,sid):
+    
+    vals = {}
+    vals["source"] = get_object_or_404(Source,id=int(sid))
+    return render_to_response('source.html',vals,context_instance=RequestContext(request))
+
 
 def addfeed(request):
 
@@ -274,6 +278,10 @@ def addfeed(request):
 
                 # import the entries now -  this is currently reparsing the feed which is dumb
                 (ok,changed) = importFeed(ns,ret.content)
+                
+                # TODO: Check the OK return val?  Surely that's a good idea
+                
+                ns.last_change = datetime.datetime.utcnow()
                 
                 ns.save()
 
@@ -559,7 +567,6 @@ def importFeed(source,feedBody,response=None):
             if response: response.write("EXISTING " + guid + "\n")
 
         except Exception as ex:
-            print ex
             if response: response.write("NEW " + guid + "\n")
             p = Post(index=0)
             p.found = datetime.datetime.utcnow()

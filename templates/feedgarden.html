@@ -25,13 +25,13 @@
             	{% for f in feeds %}
             		<tr style="{{f.gardenStyle}}">
             		    <td style="text-align:center">{{f.num_subs}}</td>
-            			<td><a href="{{f.feed_url|escape}}"><img src="/static/images/recast-small.png" alt="Feed" width="32"></a> <a href="{{f.bestLink|escape}}">{{f.displayName}}</a></td>
+            			<td><a href="/source/{{f.id}}/"><img src="/static/images/recast-small.png" alt="Feed" width="32"></a> <a href="{{f.bestLink|escape}}">{{f.displayName}}</a> (<a href="{{f.feed_url|escape}}">feed</a>)</td>
             			<td style="text-align:right">{{f.max_index}}</td>
             			<td style="text-align:right">{{f.interval|hoursmins}}</td>
             			<td>{% if f.last_success %}{{f.last_success|timesince}} ago{% else %}Never{% endif %}</td>
             			<td>{{f.due_poll|timeuntil}}</td>
             			<td>[{{f.status_code}}] {{f.last_result}}</td>
-            			<td>{% if f.lastChange %}{{f.last_change|timesince}} ago{% else %}Never{% endif %}</td>
+            			<td>{% if f.last_change %}{{f.last_change|timesince}} ago{% else %}Never{% endif %}</td>
             			<td id="r{{f.id}}"><a href="javascript:refresh({{f.id}})" class="btn btn-sm btn-default">Refresh</a></td>
             		</tr>
             	{% endfor %}
@@ -47,7 +47,7 @@
     {
     	$("#r" + fid).html('<div id="loader' + fid +'"><img src="/static/images/loader.gif" alt="Working" height="32"></div>');
     
-    	$.post("/feed/" + fid + "/revive/",function(data){
+    	$.post("/source/" + fid + "/revive/",function(data){
     	
     		$("#loader" + fid).fadeOut(function(){
     			$("#loader" + fid).html(data);

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-sm-12">
+            <img class="pull-right feed-art" src="{{source.image_url}}" alt="Logo" onerror="imgError(this);">
+            <h2>{{source.name}}</h2>
+            <p><a href="{{source.site_url}}">Show Homepage</a> - <a href="{{source.feed_url}}">Show Feed</a></p>
+
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-sm-6">
+            <h3>Episodes</h3>
+        
+            <table class="episode-list">
+                {% for p in source.post_set.all %}
+                    <tr><td>{{p.index}}</td><td>{{p.title}}</td><td>{{p.created|date}}</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+        <div class="col-sm-6">
+            <h3>Subscriptions</h3>
+        
+            <table class="episode-list">
+                <tr>
+                    <th>#</th>
+                    <th>Last Sent</th>
+                    <th>Last Read</th>
+                </tr>
+                {% for s in source.subscription_set.all %}
+                    <tr><td>{{s.last_sent}}</td><td>{{s.last_sent_date}}</td><td>{{s.accesslog_set.all.0.access_time}}</td></tr>
+                    <tr><td colspan="3" class="ua">{{s.accesslog_set.all.0.user_agent}}</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+</div>
+
+
+
+
+{% endblock %}
