@@ -30,6 +30,8 @@ urlpatterns = patterns('',
 
 
     (r'^addfeed/$', 'rc.views.addfeed'),
+    
+    ('^robots.txt$', 'rc.views.robots'),
 
     
     

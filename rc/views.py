@@ -48,6 +48,20 @@ def index(request):
 
 def help(request):
     return render_to_response("help.html",{},context_instance=RequestContext(request))
+    
+def robots(request):
+    
+    r = HttpResponse("""    
+User-agent: *
+Disallow: /admin/
+Disallow: /feed/
+Disallow: /static/
+    """)
+    
+    r["Content-Type"] = "text/plain"
+    
+    return r
+
 
 
 def feed(request,key):
