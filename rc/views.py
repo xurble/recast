@@ -68,9 +68,8 @@ def feed(request,key):
 
 
     # Check that we shouldn't be adding the next episode
-
     roll_date = sub.last_sent_date + datetime.timedelta(days=sub.frequency)
-    while roll_date < datetime.datetime.utcnow():
+    while sub.last_sent < sub.source.max_index and roll_date < datetime.datetime.utcnow():
         sub.last_sent_date = roll_date
         sub.last_sent = sub.last_sent + 1
         sub.save()
@@ -111,19 +110,13 @@ def editfeed(request,key):
     vals["subscription"] = sub
     vals["days"] = range(1,15)
     
-    #dd = sub.next_send_date
-    #vals["dropdate_year"] = dd.year
-    #vals["dropdate_month"] = dd.month - 1
-    #vals["dropdate_day"] = dd.day
-    #vals["dropdate_hour"] = dd.hour
-    #vals["dropdate_minute"] = dd.minute
-    #vals["dropdate_second"] = dd.second
     
     if request.method == "POST":
         
         if "release" in request.POST:
-            sub.last_sent = sub.last_sent + 1
-            sub.last_sent_date = datetime.datetime.utcnow()
+            if sub.last_sent < sub.source.max_index:
+                sub.last_sent = sub.last_sent + 1
+                sub.last_sent_date = datetime.datetime.utcnow()
         else:
             sub.frequency = int(request.POST["frequency"])
         
