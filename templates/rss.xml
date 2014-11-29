@@ -22,7 +22,7 @@ Visit the link in an episode to edit the recast settings.
             {% if p.author %}
                 <author>{{p.author}}</author>
             {% endif %}
-            <pubDate>{{p.createdFormatted}}</pubDate>
+            <pubDate>{{p.created_for_subscription}}</pubDate>
             <description>[&lt;a href="{{url}}edit/"&gt;edit recast settings&lt;/a&gt;] &lt;br&gt;&lt;br&gt;
                 {{ p.body }}
             </description> 
@@ -33,6 +33,7 @@ Visit the link in an episode to edit the recast settings.
             {% if p.image_url %}
                 <itunes:image href="{{p.image_url}}"/>
             {% endif %}
+            
 
         </item>  
     {% endfor %}

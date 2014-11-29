@@ -2,7 +2,7 @@
 
 from django.shortcuts import render_to_response,get_object_or_404
 from django.contrib.auth import authenticate, login,get_user
-from django.http import HttpResponseRedirect,HttpResponse,HttpResponseNotModified
+from django.http import HttpResponseRedirect,HttpResponse,HttpResponseNotModified,HttpResponseForbidden
 from django.db.models import Q
 from django.db.models import F
 from django.contrib.auth.decorators import login_required
@@ -10,12 +10,13 @@ from django.template import RequestContext
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
 
-import datetime
+import datetime 
 import hashlib
 import logging
 import sys
 import traceback
 import uuid
+import email
 
 import os
 
@@ -68,28 +69,80 @@ def feed(request,key):
 
     """ This is the actual RSS feed """
 
-    al = AccessLog(raw_id = key,return_code = 404,ip_address = request.META["REMOTE_ADDR"],user_agent=request.META["HTTP_USER_AGENT"])
-    al.save()
-    sub = get_object_or_404(Subscription,key=key)
     
+    right_now = datetime.datetime.utcnow()
+
+    al = AccessLog(raw_id = key,return_code = 410,ip_address = request.META["REMOTE_ADDR"],user_agent=request.META["HTTP_USER_AGENT"])
+    al.save()
+    try:
+        sub =Subscription.objects.get(key=key)
+    except:
+        return HttpResponse(status=410)  # let's assume that a feed that doesn't exist has been deleted
+                                         # I mean it could be mistype, but most likely not.
+          
     al.subscription = sub
     al.return_code = 500
     al.save()
     
+    sub.last_accessed = right_now
+
+    
     browser_etag = ""
     if "HTTP_IF_NONE_MATCH" in request.META:
         browser_etag = request.META["HTTP_IF_NONE_MATCH"]
+        
+    final_post = []
 
 
     # Check that we shouldn't be adding the next episode
-    roll_date = sub.last_sent_date + datetime.timedelta(days=sub.frequency)
-    while sub.last_sent < sub.source.max_index and roll_date < datetime.datetime.utcnow():
-        sub.last_sent_date = roll_date
-        sub.last_sent = sub.last_sent + 1
-        sub.save()
-        roll_date = roll_date + datetime.timedelta(days=sub.frequency)
+    if not sub.complete:
+        # hmm this will catch us up to the original schedule even for very slow pollers
+        # would it be better to just send one episode new max ? 
+        # doesn't affect me personally as Overcast has a hyper-agressive server side poller :)
+        roll_date = sub.last_sent_date + datetime.timedelta(days=sub.frequency)
+        while sub.last_sent < sub.source.max_index and roll_date < right_now:
+            sub.last_sent_date = roll_date
+            sub.last_sent = sub.last_sent + 1 
+            roll_date = roll_date + datetime.timedelta(days=sub.frequency)
 
-    return_etag = "%d-%d" % (sub.id,sub.last_sent)
+
+        if sub.last_sent == sub.source.max_index:
+            sub.complete = True
+
+        last_sent = sub.last_sent
+    else:   
+        # sub has finished
+        # wait two days then send feed closed message for 5 days.
+        # then send GONE
+        last_sent = sub.last_sent
+        if (right_now - sub.last_sent_date).days > 2:
+            if (right_now - sub.last_sent_date).days < 7:
+                last_sent += 1
+                final_post = [
+                    {
+                        "title": "Recast is complete",
+                        "recast_link":  "/",
+                        "author": "Recast",
+                        "created_for_subscription": email.Utils.formatdate(float(sub.last_sent_date.strftime('%s')))  , 
+                        "body":  "This Recast has come to an end.  If you have not already done so, you can get a link to the original source podcast feed from the settings link above.  You should subscribe to the original to continue listening to further episodes.  We hope you enjoyed using Recast.",
+                        "id": "fin!",
+                        "enclosure_set" : {"all": [ {"recast_link":  "/static/audio/end.mp3",
+                                                    "length": 94875,
+                                                    "type": "audio/mpeg"  } ] },
+                        "image_url": "/static/images/recast-large.png" ,
+                        "sub" : sub                       
+                    }
+                ]
+            else:
+                # this sub is dead and gone and waiting for deletion
+                sub.save()
+                return HttpResponse(status=410)
+            
+        
+
+    sub.save()
+
+    return_etag = "%d-%d" % (sub.id,last_sent)
     
     if return_etag == browser_etag:
         al.return_code = 304 
@@ -99,7 +152,14 @@ def feed(request,key):
     vals = {}
     vals["subscription"] = sub
     vals["source"]  = sub.source
-    vals["posts"] = Post.objects.filter(Q(source = sub.source) & Q(index__lte=sub.last_sent)).order_by("index")
+    vals["posts"] = list(Post.objects.filter(Q(source = sub.source) & Q(index__lte=sub.last_sent)).order_by("index")) 
+    
+    for p in vals["posts"]:            #so that PostSubscription works
+        p.current_subscription = sub
+    
+    
+    vals["posts"] += final_post
+    
     vals["url"] = "http://" + request.META["HTTP_HOST"] + request.path
     vals["base_href"] = "http://" + request.META["HTTP_HOST"]
     
@@ -169,11 +229,15 @@ def revivesource(request,sid):
     if request.method == "POST":
         
         s = get_object_or_404(Source,id=int(sid))
-        s.live = True
-        s.due_poll = datetime.datetime.utcnow()
-        s.etag = None
+        
+        s.live          = True
+        s.due_poll      = datetime.datetime.utcnow()
+        s.etag          = None
         s.last_modified = None
+        s.last_change   = datetime.datetime.utcnow()
+        
         s.save()
+        
         return HttpResponse("OK")
         
 @login_required
@@ -185,10 +249,10 @@ def source(request,sid):
 
 
 def addfeed(request):
-
-
     try:
-        if request.method == "POST":
+        if request.method == "GET":
+            return HttpResponseForbidden("No!")
+        elif request.method == "POST":
     
             feed = request.POST["feed"]
             
@@ -494,8 +558,8 @@ def reader(request):
         
         if interval < 60:
             interval = 60 #no less than 1 hour
-        if interval > (60 * 60 * 24 * 3):
-            interval = (60 * 60 * 24 * 3) #no more than 3 days
+        if interval > (60 * 60 * 12):
+            interval = (60 * 60 * 12) #no more than 1/2 day
         
         response.write("\nUpdating interval from %d to %d\n" % (s.interval,interval))
         s.interval = interval

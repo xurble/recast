@@ -111,7 +111,9 @@ class Subscription(models.Model):
     last_sent_date = models.DateTimeField()
     frequency      = models.IntegerField(default=5) # in days.  A little faster than a week so most podcasts catch up
     name           = models.CharField(max_length=255)
-    
+    complete       = models.BooleanField(default=False)
+    created        = models.DateTimeField(auto_now_add=True,null=True)
+    last_accessed  = models.DateTimeField(auto_now_add=True,null=True)
     
     def __unicode__(self):
         return u"'%s' on id %s" % (self.name,self.key)
@@ -132,7 +134,7 @@ class Subscription(models.Model):
                 
                 
     class Meta:
-        ordering = ["-last_sent"]
+        ordering = ["-id"]
     
                 
 class Post(models.Model):
@@ -163,7 +165,23 @@ class Post(models.Model):
     @property
     def createdFormatted(self):
         return email.Utils.formatdate(float(self.created.strftime('%s')))
+
+    @property
+    def foundFormatted(self):
+        return email.Utils.formatdate(float(self.found.strftime('%s')))
         
+        
+    @property
+    def created_for_subscription(self):
+    
+        try:
+            sp = SubscriptionPost.objects.filter(post=self).filter(subscription=self.current_subscription)[0]
+        except:
+            sp = SubscriptionPost(post=self,subscription=self.current_subscription)
+            sp.save()
+        
+        return email.Utils.formatdate(float(sp.created.strftime('%s')))        
+
 
     @property
     def recast_link(self):
@@ -181,6 +199,12 @@ class Post(models.Model):
 
     class Meta:
         ordering = ["index"]
+        
+        
+class SubscriptionPost(models.Model):
+    post         = models.ForeignKey(Post)
+    subscription = models.ForeignKey(Subscription)
+    created      = models.DateTimeField(auto_now_add=True)
 
         
 class Enclosure(models.Model):
