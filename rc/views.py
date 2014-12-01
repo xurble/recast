@@ -129,13 +129,16 @@ def feed(request,key):
                         "enclosure_set" : {"all": [ {"recast_link":  "/static/audio/end.mp3",
                                                     "length": 94875,
                                                     "type": "audio/mpeg"  } ] },
-                        "image_url": "/static/images/recast-large.png" ,
+                        "image_url": "http://" + request.META["HTTP_HOST"] + "/static/images/recast-large.png" ,
                         "sub" : sub                       
                     }
                 ]
             else:
                 # this sub is dead and gone and waiting for deletion
                 sub.save()
+                al.return_code = 410    
+                al.save()
+
                 return HttpResponse(status=410)
             
         
