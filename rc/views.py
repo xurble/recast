@@ -42,7 +42,7 @@ def index(request):
     if "feed" in request.GET:
         vals["feed"] = request.GET["feed"]
 
-    vals["popular"] = Source.objects.all().order_by("-num_subs")[:8]
+    vals["popular"] = Source.objects.all().order_by("?")[:6]
 
     return render_to_response("index.html",vals,context_instance=RequestContext(request))
 
@@ -317,11 +317,13 @@ def addfeed(request):
                     return HttpResponse("""
                         <h2>Success!</h2>
                         
-                        <p>Created recast of %s at <a href='%s'>%s</a></p>
+                        <p>Here is your Recast of %s: <a href='%s'>%s</a></p>
                         
-                        <p>You can subscribe to this link now in your podcast app, or <a href="%sedit/">or edit the settings here</a>.</p>
+                        <p>You can subscribe to this link now in any podcast app.</p>
 
-                        <p>A link to the recast settings will be added to every episode in case you want to change them in the future.</p>
+                        <p>A link to the Recast settings will be added to every episode in case you want to change them in the future.</p>
+                        
+                        <p><a href="%sedit/">Or you can change them right now.</a></p>
                         
                         <p>Happy listening!</p>
                         
