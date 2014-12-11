@@ -28,7 +28,7 @@ Visit the link in an episode to edit the recast settings.
             </description> 
             <guid>{{subscription.key}}/{{p.id}}</guid> 
             {% for e in p.enclosure_set.all %}
-                <enclosure url="{{base_href}}{{e.recast_link}}" length="{{e.length}}" type="{{e.type}}" />
+                <enclosure url="{{base_href}}{{e.recast_link}}"{% if e.length %} length="{{e.length}}"{% endif %} type="{{e.type}}" />
             {% endfor %}            
             {% if p.image_url %}
                 <itunes:image href="{{p.image_url}}"/>

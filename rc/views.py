@@ -34,7 +34,7 @@ from urlparse import urljoin
 import requests
 
 
-
+ 
 def index(request):
 
     vals = {}
@@ -366,11 +366,13 @@ def addfeed(request):
                 return HttpResponse("""
                         <h2>Success!</h2>
                         
-                        <p>Created recast of %s at <a href='%s'>%s</a></p>
+                        <p>Here is your Recast of %s: <a href='%s'>%s</a></p>
                         
-                        <p>You can subscribe to this link now in your podcast app, or <a href="%sedit/">or edit the settings here</a>.</p>
+                        <p>You can subscribe to this link now in any podcast app.</p>
 
-                        <p>A link to the recast settings will be added to every episode in case you want to change them in the future.</p>
+                        <p>A link to the Recast settings will be added to every episode in case you want to change them in the future.</p>
+                        
+                        <p><a href="%sedit/">Or you can change them right now.</a></p>
                         
                         <p>Happy listening!</p>
                         
@@ -684,10 +686,16 @@ def importFeed(source,feedBody,response=None):
                 # check existing enclosure is still there
                 found_enclosure = False
                 for pe in e["enclosures"]:
+                    
                     if pe["href"] == ee.href:
                         found_enclosure = True
                         pe["href"] = "X" # don't re-add in hte second pass
-                        ee.length = int(pe["length"])
+                        
+                        try:
+                            ee.length = int(pe["length"])
+                        except:
+                            ee.length = 0
+                        
                         ee.type = pe["type"]
                         ee.save()
                         break
@@ -697,7 +705,13 @@ def importFeed(source,feedBody,response=None):
             for pe in e["enclosures"]:
                 try:
                     if pe["href"] != "X":
-                        ee = Enclosure(post = p , href = pe["href"], length = int(pe["length"]), type = pe["type"])
+                    
+                        try:
+                            length = int(pe["length"])
+                        except:
+                            length = 0
+                    
+                        ee = Enclosure(post = p , href = pe["href"], length = length, type = pe["type"])
                         ee.save()
                 except Exception as ex:
                     pass
