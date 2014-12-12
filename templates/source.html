@@ -35,7 +35,8 @@
                     <tr>
                         <td>{{s.last_sent}} {% if s.complete %}(done){% endif %}</td>
                         <td>{{s.frequency}}</td>
-                        <td>{{s.last_sent_date}}</td><td>{{s.accesslog_set.all.0.access_time}}</td>
+                        <td>{{s.last_sent_date}}</td>
+                        <td>{{s.last_accessed}}</td>
                     </tr>
                     <tr><td colspan="4" class="ua">{{s.accesslog_set.all.0.user_agent}} ({{s.accesslog_set.all.0.return_code}})</td></tr>
                 {% endfor %}

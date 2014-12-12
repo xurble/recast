@@ -94,8 +94,11 @@ def feed(request,key):
     final_post = []
 
 
-    # Check that we shouldn't be adding the next episode
     if not sub.complete:
+    
+        # Check that we shouldn't be adding the next episode
+
+    
         # hmm this will catch us up to the original schedule even for very slow pollers
         # would it be better to just send one episode new max ? 
         # doesn't affect me personally as Overcast has a hyper-agressive server side poller :)
@@ -110,7 +113,8 @@ def feed(request,key):
             sub.complete = True
 
         last_sent = sub.last_sent
-    else:   
+    else: 
+      
         # sub has finished
         # wait two days then send feed closed message for 5 days.
         # then send GONE
