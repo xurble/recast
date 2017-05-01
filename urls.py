@@ -1,10 +1,12 @@
-from django.conf.urls.defaults import patterns, include, url
+from django.conf.urls import include, url
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 admin.autodiscover()
 
-urlpatterns = patterns('',
+from rc.views import *
+
+urlpatterns = [
     # Examples:
     # url(r'^$', 'feedthing.views.home', name='home'),
     # url(r'^feedthing/', include('feedthing.foo.urls')),
@@ -16,47 +18,47 @@ urlpatterns = patterns('',
     url(r'^admin/', include(admin.site.urls)),
 
 
-    (r'^$', 'rc.views.index'),
-    (r'^refresh/$', 'rc.views.reader'),
-    (r'^help/$', 'rc.views.help'),
+    url(r'^$', index),
+    url(r'^refresh/$', reader),
+    url(r'^help/$', help),
 
-    (r'^feed/(?P<key>.*)/edit/$','rc.views.editfeed'),
+    url(r'^feed/(?P<key>.*)/edit/$',editfeed),
 
 
-    (r'^source/(?P<sid>.*)/revive/$','rc.views.revivesource'),
-    (r'^source/(?P<sid>.*)/$','rc.views.source'),
+    url(r'^source/(?P<sid>.*)/revive/$',revivesource),
+    url(r'^source/(?P<sid>.*)/$',source),
     
-    (r'^feed/(?P<key>.*)/$','rc.views.feed'),
+    url(r'^feed/(?P<key>.*)/$',feed),
 
 
-    (r'^post/(?P<pid>.*)/$','rc.views.post_redirect'),
-    (r'^enclosure/(?P<eid>.*)/$','rc.views.enclosure_redirect'),
+    url(r'^post/(?P<pid>.*)/$',post_redirect),
+    url(r'^enclosure/(?P<eid>.*)/$',enclosure_redirect),
 
 
-    (r'^addfeed/$', 'rc.views.addfeed'),
+    url(r'^addfeed/$', addfeed),
 
-    (r'^feedgarden/$', 'rc.views.feedgarden'),
-
-    
-
-    ('^robots.txt$', 'rc.views.robots'),
+    url(r'^feedgarden/$', feedgarden),
 
     
-)
+
+    url('^robots.txt$', robots),
+
+    
+]
 
 """
-    (r'^allfeeds/$', 'rc.views.allfeeds'),
-    (r'^importopml/$', 'rc.views.importopml'),
-    (r'^accounts/login','rc.views.loginpage'),
-    (r'^read/(?P<fid>.*)/(?P<qty>.*)/','rc.views.readfeed'),
+    (r'^allfeeds/$', allfeeds'),
+    (r'^importopml/$', importopml'),
+    (r'^accounts/login',loginpage'),
+    (r'^read/(?P<fid>.*)/(?P<qty>.*)/',readfeed'),
 
 
     
-    (r'^subscription/(?P<sid>.*)/unsubscribe/$','rc.views.unsubscribefeed'),
-    (r'^subscription/(?P<sid>.*)/details/$','rc.views.subscriptiondetails'),
-    (r'^subscription/(?P<sid>.*)/promote/$','rc.views.promote'),
-    (r'^subscription/(?P<sid>.*)/addto/(?P<tid>.*)/$','rc.views.addto'),
+    (r'^subscription/(?P<sid>.*)/unsubscribe/$',unsubscribefeed'),
+    (r'^subscription/(?P<sid>.*)/details/$',subscriptiondetails'),
+    (r'^subscription/(?P<sid>.*)/promote/$',promote'),
+    (r'^subscription/(?P<sid>.*)/addto/(?P<tid>.*)/$',addto'),
 
 
-    (r'^feed/(?P<fid>.*)/kill/$','rc.views.killfeed'),
+    (r'^feed/(?P<fid>.*)/kill/$',killfeed'),
 """

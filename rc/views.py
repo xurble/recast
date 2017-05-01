@@ -1,12 +1,11 @@
 # Create your views here.
 
-from django.shortcuts import render_to_response,get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.contrib.auth import authenticate, login,get_user
 from django.http import HttpResponseRedirect,HttpResponse,HttpResponseNotModified,HttpResponseForbidden
 from django.db.models import Q
 from django.db.models import F
 from django.contrib.auth.decorators import login_required
-from django.template import RequestContext
 from django.utils.timezone import utc
 from django.views.decorators.csrf import csrf_exempt
 
@@ -44,11 +43,12 @@ def index(request):
 
     vals["popular"] = Source.objects.all().order_by("?")[:6]
 
-    return render_to_response("index.html",vals,context_instance=RequestContext(request))
+    return render(request, "index.html",vals)
 
 
 def help(request):
-    return render_to_response("help.html",{},context_instance=RequestContext(request))
+    return render(request, "help.html",{} )
+
     
 def robots(request):
     
@@ -170,7 +170,7 @@ def feed(request,key):
     vals["url"] = "http://" + request.META["HTTP_HOST"] + request.path
     vals["base_href"] = "http://" + request.META["HTTP_HOST"]
     
-    r = render_to_response("rss.xml",vals,context_instance=RequestContext(request))
+    r = render(request, "rss.xml",vals)
     
     r["ETag"] = return_etag
     #r["Content-Type"] = "text/plain"
@@ -206,7 +206,7 @@ def editfeed(request,key):
     vals["episodes"] = list(sub.source.post_set.filter(index__gt=(sub.last_sent-5)).filter(index__lt=(sub.last_sent+5)))
     
 
-    return render_to_response("feed.html",vals,context_instance=RequestContext(request))
+    return render(request,"feed.html",vals)
         
 
 
@@ -228,7 +228,7 @@ def enclosure_redirect(request,eid):
 def feedgarden(request):
     vals = {}
     vals["feeds"] = Source.objects.all().order_by("due_poll")
-    return render_to_response('feedgarden.html',vals,context_instance=RequestContext(request))
+    return render(request,'feedgarden.html',vals)
     
 @login_required
 def revivesource(request,sid):
@@ -252,7 +252,7 @@ def source(request,sid):
     
     vals = {}
     vals["source"] = get_object_or_404(Source,id=int(sid))
-    return render_to_response('source.html',vals,context_instance=RequestContext(request))
+    return render(request, 'source.html',vals)
 
 
 def addfeed(request):
