@@ -6,7 +6,8 @@ SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
 import server_settings
 
-DEBUG = False
+
+DEBUG = server_settings.DEBUG
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (

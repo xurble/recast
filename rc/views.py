@@ -714,8 +714,13 @@ def importFeed(source,feedBody,response=None):
                             length = int(pe["length"])
                         except:
                             length = 0
+                            
+                        try:
+                            type = pe["type"]
+                        except:
+                            type = "audio/mpeg"
                     
-                        ee = Enclosure(post = p , href = pe["href"], length = length, type = pe["type"])
+                        ee = Enclosure(post = p , href = pe["href"], length = length, type = type)
                         ee.save()
                 except Exception as ex:
                     pass

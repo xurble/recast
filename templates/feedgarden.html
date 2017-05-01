@@ -45,7 +45,7 @@
 
     function refresh(fid)
     {
-    	$("#r" + fid).html('<div id="loader' + fid +'"><img src="/static/images/loader.gif" alt="Working" height="32"></div>');
+    	$("#r" + fid).html('<div id="loader' + fid +'"><img src="/static/images/loader.gif" alt="Working" height="32" width="32"></div>');
     
     	$.post("/source/" + fid + "/revive/",function(data){
     	
