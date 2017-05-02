@@ -2,3 +2,4 @@ Django==1.11
 pytz==2017.2
 requests==2.13.0
 wsgiref==0.1.2
+MySQL-python==1.2.5
