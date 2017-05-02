@@ -1,4 +1,4 @@
-recast
+Recast
 ======
 
 Recast is a django based podcast feed rebroadcaster.  There is a running version at http://recastthis.com if you want to try it out.
@@ -14,11 +14,13 @@ By default Recast will feed you a new episode of the podcast every five days - e
 Installation
 ============
 
-Recast is a pretty simple django (1.4 - sorry) application.  The only external dependencies are south and requests.
+Recast is a pretty simple django (1.11) application.  The only external dependency is requests.
 
 Once it is running, in order to keep it ticking over and reading feeds, something needs to keep hitting /refresh/
 
-I have that set up as a cron job using curl.  This is a cheesy way to work around the severe lameness of my current hosting.
+I have that set up as a cron job using curl that fires every five minutes.  This is a cheesy way to work around the severe lameness of my current hosting.
+
+If you were to run it on something sensible, you'd probably want to use Celery or similar.
 
 And that's it.
 
