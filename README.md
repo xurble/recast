@@ -14,7 +14,7 @@ By default Recast will feed you a new episode of the podcast every five days - e
 Installation
 ============
 
-Recast is a pretty simple django (1.11) application.  The only external dependencies are requests and python-mysql.
+Recast is a pretty simple django (2.2) application.  The only external dependencies are requests and python-mysql.
 
 Once it is running, in order to keep it ticking over and reading feeds, something needs to keep hitting /refresh/
 

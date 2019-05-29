@@ -23,13 +23,13 @@ import feedparser
 
 #from xml.dom import minidom
 
-from models import *
+from .models import *
 
 import time
 import datetime
 
-from BeautifulSoup import BeautifulSoup
-from urlparse import urljoin
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 import requests
 
 
@@ -189,7 +189,7 @@ def editfeed(request,key):
     vals = {}
     
     vals["subscription"] = sub
-    vals["days"] = range(1,15)
+    vals["days"] = list(range(1,15))
     
     
     if request.method == "POST":
@@ -282,7 +282,7 @@ def addfeed(request):
                 feedcount = 0
                 rethtml = ""
                 for l in soup.findAll(name='link'):
-                    if l.has_key("rel") and l.has_key("type"):
+                    if "rel" in l and "type" in l:
                         if l['rel'] == "alternate" and (l['type'] == 'application/atom+xml' or l['type'] == 'application/rss+xml'):
                             feedcount += 1
                             try:
@@ -421,7 +421,7 @@ def reader(request):
             s.status_code = ret.status_code
             s.last_result = "Unhandled Case"
         except Exception as ex:
-            print ex
+            print(ex)
             s.last_result = "Fetch error:" + str(ex)
             s.status_code = 0
             response.write("\nFetch error: " + str(ex))
@@ -736,7 +736,7 @@ def importFeed(source,feedBody,response=None):
             #response.write(str(sys.exc_info()[0]))
             if response: 
                 response.write("\nSave error for post:" + str(sys.exc_info()[0]))
-                traceback.print_tb(sys.exc_traceback,file=response)
+                traceback.print_tb(sys.exc_info()[2],file=response)
 
 
     if changed:

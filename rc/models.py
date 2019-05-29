@@ -4,7 +4,7 @@ from django.db import models
 
 import time
 import datetime
-from urllib import urlencode
+from urllib.parse import urlencode
 import logging
 import sys
 from django.utils.timezone import utc
@@ -40,7 +40,7 @@ class Source(models.Model):
     num_subs       = models.IntegerField(default=1)
     
     
-    def __unicode__(self):
+    def __str__(self):
         return self.displayName()
     
     def bestLink(self):
@@ -106,7 +106,7 @@ class Source(models.Model):
 class Subscription(models.Model):
 
     key            = models.CharField(unique=True,max_length=64)
-    source         = models.ForeignKey(Source) 
+    source         = models.ForeignKey(Source, on_delete=models.CASCADE) 
     last_sent      = models.IntegerField(default=1)
     last_sent_date = models.DateTimeField()
     frequency      = models.IntegerField(default=5) # in days.  A little faster than a week so most podcasts catch up
@@ -115,8 +115,8 @@ class Subscription(models.Model):
     created        = models.DateTimeField(auto_now_add=True,null=True)
     last_accessed  = models.DateTimeField(auto_now_add=True,null=True)
     
-    def __unicode__(self):
-        return u"'%s' on id %s" % (self.name,self.key)
+    def __str__(self):
+        return "'%s' on id %s" % (self.name,self.key)
     
     def unreadCount(self):
         if self.source:
@@ -139,7 +139,7 @@ class Subscription(models.Model):
                 
 class Post(models.Model):
     
-    source        = models.ForeignKey(Source,db_index=True)
+    source        = models.ForeignKey(Source,db_index=True, on_delete=models.CASCADE)
     title         = models.TextField()
     body          = models.TextField()
     link          = models.CharField(max_length=255,blank=True,null=True)
@@ -194,7 +194,7 @@ class Post(models.Model):
         return "/post/%d/" % self.id
         
     
-    def __unicode__(self):
+    def __str__(self):
         return "%s: post %d, %s" % (self.source.displayName(),self.index,self.title)
 
     class Meta:
@@ -202,13 +202,13 @@ class Post(models.Model):
         
         
 class SubscriptionPost(models.Model):
-    post         = models.ForeignKey(Post)
-    subscription = models.ForeignKey(Subscription)
+    post         = models.ForeignKey(Post, on_delete=models.CASCADE)
+    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE)
     created      = models.DateTimeField(auto_now_add=True)
 
         
 class Enclosure(models.Model):
-    post   = models.ForeignKey(Post)
+    post   = models.ForeignKey(Post, on_delete=models.CASCADE)
     length = models.IntegerField()
     href   = models.CharField(max_length=512)
     type   = models.CharField(max_length=256) 
@@ -226,14 +226,14 @@ class Enclosure(models.Model):
 
     
 class AccessLog(models.Model):
-    subscription = models.ForeignKey(Subscription,blank=True,null=True)
+    subscription = models.ForeignKey(Subscription,blank=True,null=True, on_delete=models.CASCADE)
     raw_id       = models.CharField(max_length=128)
     access_time  = models.DateTimeField(auto_now_add=True)
     ip_address   = models.CharField(max_length=16)
     user_agent   = models.CharField(max_length=512)
     return_code  = models.IntegerField()
     
-    def __unicode__(self):
+    def __str__(self):
     
         if self.subscription:
             return "%d @ %s - %s from %s -- %s" % (self.return_code, self.access_time,self.subscription.name,self.ip_address,self.user_agent)
