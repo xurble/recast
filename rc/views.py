@@ -256,9 +256,10 @@ def source(request,sid):
 
 
 def addfeed(request):
+
     try:
         if request.method == "GET":
-            return HttpResponseForbidden("No!")
+            return HttpResponseForbidden("No!")  # TODO: PermissionDenied
         elif request.method == "POST":
     
             feed = request.POST["feed"]
@@ -267,7 +268,7 @@ def addfeed(request):
                 return HttpResponse("<h2>Subscription Error</h2>You cannot recast a Recast feed!")
                 
         
-            headers = { "User-Agent": "Recast/1.0 (+http://%s; Initial Feed Crawler)" % request.META["HTTP_HOST"], "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
+            headers = { "User-Agent": "Recast/1.1 (+http://%s; Initial Feed Crawler)" % request.META["HTTP_HOST"], "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
 
             ret = requests.get(feed, headers=headers)
             #can I be bothered to check return codes here?  I think not on balance
@@ -282,8 +283,9 @@ def addfeed(request):
                 feedcount = 0
                 rethtml = ""
                 for l in soup.findAll(name='link'):
-                    if "rel" in l and "type" in l:
-                        if l['rel'] == "alternate" and (l['type'] == 'application/atom+xml' or l['type'] == 'application/rss+xml'):
+                    if l.has_attr("rel") and l.has_attr("type"):
+                        print(l)
+                        if l['rel'][0] == "alternate" and (l['type'] == 'application/atom+xml' or l['type'] == 'application/rss+xml'):
                             feedcount += 1
                             try:
                                 name = l['title']
@@ -388,7 +390,6 @@ def addfeed(request):
 
 
 def reader(request):
-
     
     response = HttpResponse()
 
@@ -408,7 +409,7 @@ def reader(request):
     
         interval = s.interval
     
-        headers = { "User-Agent": "Recast/1.0 (+http://%s; Updater; %d subscribers)" % (request.META["HTTP_HOST"],s.num_subs), "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
+        headers = { "User-Agent": "Recast/1.1 (+http://%s; Updater; %d subscribers)" % (request.META["HTTP_HOST"],s.num_subs), "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
         if s.etag:
             headers["If-None-Match"] = str(s.etag)
         if s.last_modified:
@@ -672,7 +673,7 @@ def importFeed(source,feedBody,response=None):
 
         try:
         
-            p.created  = datetime.datetime.fromtimestamp(time.mktime(e.date_parsed))
+            p.created  = datetime.datetime.fromtimestamp(time.mktime(e.date_parsed)) # TODO: This is failing
             # p.created  = datetime.datetime.utcnow()
         except Exception as ex:
             if response: response.write("CREATED ERROR")     
