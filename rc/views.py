@@ -417,12 +417,13 @@ def reader(request):
         response.write(headers)
         ret = None
         response.write("\nFetching %s" % s.feed_url)
+        
         try:
             ret = requests.get(s.feed_url,headers=headers,allow_redirects=False,  timeout=30)
             s.status_code = ret.status_code
             s.last_result = "Unhandled Case"
+            response.write("\nFetched: " + str(ret))
         except Exception as ex:
-            print(ex)
             s.last_result = "Fetch error:" + str(ex)
             s.status_code = 0
             response.write("\nFetch error: " + str(ex))
