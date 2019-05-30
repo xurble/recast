@@ -443,7 +443,7 @@ def reader(request):
             s.last_result = "The feed could not be found"
         elif ret.status_code == 403 or ret.status_code == 410: #Forbidden or gone
 
-            if "Cloudflare" in ret.content or ("Server" in ret.headers and "cloudflare" in ret.headers["Server"]):
+            if "Cloudflare" in ret.text or ("Server" in ret.headers and "cloudflare" in ret.headers["Server"]):
                 s.is_cloudflare = True
                 s.last_result = "Feed is protected by Cloudflare (%d)" % ret.status_code
             else:
