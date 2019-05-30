@@ -164,11 +164,11 @@ class Post(models.Model):
     
     @property
     def createdFormatted(self):
-        return email.Utils.formatdate(float(self.created.strftime('%s')))
+        return email.utils.formatdate(float(self.created.strftime('%s')))
 
     @property
     def foundFormatted(self):
-        return email.Utils.formatdate(float(self.found.strftime('%s')))
+        return email.utils.formatdate(float(self.found.strftime('%s')))
         
         
     @property
@@ -180,7 +180,7 @@ class Post(models.Model):
             sp = SubscriptionPost(post=self,subscription=self.current_subscription)
             sp.save()
         
-        return email.Utils.formatdate(float(sp.created.strftime('%s')))        
+        return email.utils.formatdate(float(sp.created.strftime('%s')))        
 
 
     @property

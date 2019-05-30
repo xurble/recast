@@ -270,7 +270,7 @@ def addfeed(request):
         
             headers = { "User-Agent": "Recast/1.1 (+http://%s; Initial Feed Crawler)" % request.META["HTTP_HOST"], "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
 
-            ret = requests.get(feed, headers=headers)
+            ret = requests.get(feed, headers=headers, timeout=30)
             #can I be bothered to check return codes here?  I think not on balance
             
             ff = feedparser.parse(ret.content) # are we a feed?
@@ -418,7 +418,7 @@ def reader(request):
         ret = None
         response.write("\nFetching %s" % s.feed_url)
         try:
-            ret = requests.get(s.feed_url,headers=headers,allow_redirects=False)
+            ret = requests.get(s.feed_url,headers=headers,allow_redirects=False,  timeout=30)
             s.status_code = ret.status_code
             s.last_result = "Unhandled Case"
         except Exception as ex:
@@ -497,7 +497,7 @@ def reader(request):
                     newURL = start + end + newURL
                     
                 
-                ret = requests.get(newURL,headers=headers,allow_redirects=True)
+                ret = requests.get(newURL,headers=headers,allow_redirects=True, timeout=30)
                 s.status_code = ret.status_code
                 s.last_result = "Temporary Redirect to " + newURL
 
@@ -543,9 +543,7 @@ def reader(request):
             
             response.write("\nEtag:%s\nLast Mod:%s\n\n" % (s.etag,s.last_modified))
             
-            
-            (ok,changed) = importFeed(source=s,feedBody=ret.content,response=response)
-            
+            (ok,changed) = importFeed(source=s, feedBody=ret.text, response=response)
             
             if ok and changed:
                 interval /= 2
@@ -620,12 +618,15 @@ def importFeed(source,feedBody,response=None):
     entries.reverse() # Entries are typically in reverse chronological order - put them in right order
     for e in entries:
         try:
-            body = e.content[0].value
+            body = e.description
         except Exception as ex:
             try:
-                body = e.description
+                body = e.summary
             except Exception as ex:
-                body = " "
+                try:
+                    body = e.content[0].value
+                except Exception as ex:
+                    body = " "
 
 
         try:
@@ -640,7 +641,7 @@ def importFeed(source,feedBody,response=None):
                     
         try:
             p  = Post.objects.filter(source=source).filter(guid=guid)[0]
-            if response: response.write("EXISTING " + guid + "\n")
+            if response: response.write("EXISTING {}/{}\n".format(p.id,  guid))
 
         except Exception as ex:
             if response: response.write("NEW " + guid + "\n")
@@ -673,10 +674,10 @@ def importFeed(source,feedBody,response=None):
 
         try:
         
-            p.created  = datetime.datetime.fromtimestamp(time.mktime(e.date_parsed)) # TODO: This is failing
+            p.created  = datetime.datetime.fromtimestamp(time.mktime(e.published_parsed)) 
             # p.created  = datetime.datetime.utcnow()
         except Exception as ex:
-            if response: response.write("CREATED ERROR")     
+            if response: response.write("CREATED ERROR - ")     
             p.created  = datetime.datetime.utcnow()
         
         # response.write("CC %s \n" % str(p.created))
@@ -700,8 +701,13 @@ def importFeed(source,feedBody,response=None):
                             ee.length = int(pe["length"])
                         except:
                             ee.length = 0
-                        
-                        ee.type = pe["type"]
+
+                        try:
+                            type = pe["type"]
+                        except:
+                            type = "audio/mpeg"
+
+                        ee.type = type
                         ee.save()
                         break
                 if not found_enclosure:
@@ -725,19 +731,18 @@ def importFeed(source,feedBody,response=None):
                         ee.save()
                 except Exception as ex:
                     pass
-        except:
+        except Exception as ex:
             if response:
-                response.write("No enclosures")
+                response.write("No enclosures - " + str(ex))
 
         try:
-            p.body = body                       
+            p.body = body.encode("UTF-8")                   
             p.save()
             # response.write(p.body)
         except Exception as ex:
             #response.write(str(sys.exc_info()[0]))
             if response: 
-                response.write("\nSave error for post:" + str(sys.exc_info()[0]))
-                traceback.print_tb(sys.exc_info()[2],file=response)
+                response.write("\nSave error for post:" + str(ex))
 
 
     if changed:
