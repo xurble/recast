@@ -39,6 +39,8 @@ class Source(models.Model):
     
     num_subs       = models.IntegerField(default=1)
     
+    is_cloudflare  = models.BooleanField(default=False)
+    
     
     def __str__(self):
         return self.displayName()

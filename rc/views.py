@@ -442,8 +442,15 @@ def reader(request):
             interval += 120
             s.last_result = "The feed could not be found"
         elif ret.status_code == 403 or ret.status_code == 410: #Forbidden or gone
+
+            if "Cloudflare" in ret.content or ("Server" in ret.headers and "cloudflare" in ret.headers["Server"]):
+                s.is_cloudflare = True
+                s.last_result = "Feed is protected by Cloudflare (%d)" % ret.status_code
+            else:
+                s.last_result = "Feed is no longer accessible (%d)" % ret.status_code
+
             s.live = False
-            s.last_result = "Feed is no longer accessible (%d)" % ret.status_code
+            
         elif ret.status_code >= 400 and ret.status_code < 500:
             #treat as bad request
             s.live = False
