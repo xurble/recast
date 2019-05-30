@@ -1,5 +1,5 @@
 Django~=2.2
 requests~=2.22
 mysqlclient
-BeautifulSoup4~=4.7
-feedparser~=5.2
+beautifulsoup4==4.7.1
+feedparser==5.2.1
