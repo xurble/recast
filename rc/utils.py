@@ -10,10 +10,14 @@ import feedparser
 
 def update_feeds(response, max_feeds=3):
 
-    sources = Source.objects.filter(Q(due_poll__lt = datetime.datetime.utcnow()) & Q(live = True))[:max_feeds]
+    todo = Source.objects.filter(Q(due_poll__lt = datetime.datetime.utcnow()) & Q(live = True))
+    
+    if response: response.write("Queue size is {}".format(todo.count()))
+
+    sources = todo.order_by("due_poll")[:max_feeds]
 
     
-    if response: response.write("Update Q: %d\n\n" % sources.count())
+    if response: response.write("\nProcessing %d\n\n" % sources.count())
     for s in sources:
         
         was302 = False
