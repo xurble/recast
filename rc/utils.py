@@ -368,7 +368,7 @@ def importFeed(source,feedBody,response=None):
                 response.write("No enclosures - " + str(ex))
 
         try:
-            p.body = body.encode("UTF-8")                   
+            p.body = body         
             p.save()
             # response.write(p.body)
         except Exception as ex:
