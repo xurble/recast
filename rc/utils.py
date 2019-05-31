@@ -3,7 +3,7 @@ import requests
 from rc.models import Source, Enclosure, Post
 import datetime
 import time
-
+import hashlib 
 from django.conf import settings
 import feedparser
 
@@ -193,10 +193,10 @@ def update_feeds(response, max_feeds=3):
         #   s.last_result = oops
             
         
-        if interval < 60:
-            interval = 60 #no less than 1 hour
-        if interval > (60 * 60 * 12):
-            interval = (60 * 60 * 12) #no more than 1/2 day
+        if interval < 160:
+            interval = 120 # no less than 2 hours
+        if interval > (60 * 24):
+            interval = (60 * 24) # no more than a day
         
         if response: response.write("\nUpdating interval from %d to %d\n" % (s.interval,interval))
         s.interval = interval
