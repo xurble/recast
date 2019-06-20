@@ -313,7 +313,7 @@ def addfeed(request):
                     #feed already exists  # create a subscription to it
                     s = s[0]
                     
-                    sub = Subscription(source=s,key=uuid.uuid4(),name=s.displayName())
+                    sub = Subscription(source=s,key=uuid.uuid4(),name=s.display_name)
                     sub.last_sent_date = datetime.datetime.utcnow()
                     sub.save()                        
 
@@ -363,7 +363,7 @@ def addfeed(request):
                 ns.save()
 
             
-                sub = Subscription(source=ns,key=uuid.uuid4(),name=ns.displayName())
+                sub = Subscription(source=ns,key=uuid.uuid4(),name=ns.display_name)
                 sub.last_sent_date = datetime.datetime.utcnow()
                 
                 sub.save()
