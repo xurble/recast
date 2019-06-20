@@ -3,3 +3,4 @@ requests~=2.22
 mysqlclient
 beautifulsoup4==4.7.1
 feedparser==5.2.1
+django-feed-reader

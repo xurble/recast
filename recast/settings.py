@@ -14,6 +14,9 @@ ADMINS = (
     # ('Your Name', 'your_email@example.com'),
 )
 
+FEEDS_USER_AGENT = "Recast/1.2"
+FEEDS_SERVER = server_settings.FEEDS_SERVER
+
 MANAGERS = ADMINS
 
 DATABASES = server_settings.DATABASES
@@ -35,7 +38,7 @@ LANGUAGE_CODE = 'en-us'
 
 SITE_ID = 1
 
-USE_TZ = False
+USE_TZ = True
 
 # If you set this to False, Django will make some optimizations so as not
 # to load the internationalization machinery.
@@ -132,6 +135,7 @@ INSTALLED_APPS = (
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
     'rc',
+    'feeds',
 )
 
 # A sample logging configuration. The only tangible logging

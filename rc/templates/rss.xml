@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+{% load rc_tags %}<?xml version="1.0" encoding="utf-8"?>
 <rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
     <channel> 
         <title>{{source.name}} (recast)</title> 
@@ -22,7 +22,7 @@ Visit the link in an episode to edit the recast settings.
             {% if p.author %}
                 <author>{{p.author}}</author>
             {% endif %}
-            <pubDate>{{p.created_for_subscription}}</pubDate>
+            <pubDate>{{p|subscription_created}}</pubDate>
             <description>[&lt;a href="{{url}}edit/"&gt;edit recast settings&lt;/a&gt;] &lt;br&gt;&lt;br&gt;
                 {{ p.body }}
             </description> 

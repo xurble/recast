@@ -6,10 +6,10 @@ from django.http import HttpResponseRedirect,HttpResponse,HttpResponseNotModifie
 from django.db.models import Q
 from django.db.models import F
 from django.contrib.auth.decorators import login_required
-from django.utils.timezone import utc
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-
-from rc.utils import update_feeds
+from django.conf import settings
+from feeds.utils import update_feeds, import_feed
 
 import datetime 
 import hashlib
@@ -72,7 +72,7 @@ def feed(request,key):
     """ This is the actual RSS feed """
 
     
-    right_now = datetime.datetime.utcnow()
+    right_now = timezone.now()
 
     al = AccessLog(raw_id = key,return_code = 410,ip_address = request.META["REMOTE_ADDR"],user_agent=request.META["HTTP_USER_AGENT"])
     al.save()
@@ -270,18 +270,34 @@ def addfeed(request):
                 return HttpResponse("<h2>Subscription Error</h2>You cannot recast a Recast feed!")
                 
         
-            headers = { "User-Agent": "Recast/1.1 (+http://%s; Initial Feed Crawler)" % request.META["HTTP_HOST"], "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
+            headers = { "User-Agent": "{} (+{}; Initial Feed Crawler)".format(settings.FEEDS_USER_AGENT, settings.FEEDS_SERVER), "Cache-Control":"no-cache,max-age=0", "Pragma":"no-cache" } #identify ourselves and also stop our requests getting picked up by google's cache
 
             ret = requests.get(feed, headers=headers, timeout=30)
             #can I be bothered to check return codes here?  I think not on balance
             
-            ff = feedparser.parse(ret.content) # are we a feed?
-            
-            isFeed = (len(ff.entries) > 0)            
+            isFeed = False  
+
+            content_type = "Not Set"
+            if "Content-Type" in ret.headers:
+                content_type = ret.headers["Content-Type"]
+                
+            feed_title = feed
+             
+            body = ret.text.strip()
+            if "xml" in content_type or body[0:1] == "<":
+                ff = feedparser.parse(body) # are we a feed?
+                isFeed = (len(ff.entries) > 0) 
+                if isFeed:
+                    feed_title = ff.feed.title
+            if "json" in content_type or body[0:1] == "{":
+                data = json.loads(body)
+                isFeed = "items" in data and len(data["items"]) > 0
+                if isFeed:
+                    feed_title = data["title"]
 
             if not isFeed:
             
-                soup = BeautifulSoup(ret.content)
+                soup = BeautifulSoup(body)
                 feedcount = 0
                 rethtml = ""
                 for l in soup.findAll(name='link'):
@@ -345,16 +361,17 @@ def addfeed(request):
                     
                 ns.name = feed
                 try:
-                    ns.htmlUrl = ff.feed.link
+                    ns.html_url = ff.feed.link
                     ns.name = ff.feed.title
                 except Exception as ex:
                     pass
                 ns.feed_url = feed
                 ns.num_subs = 1
                 ns.save()
+                
 
                 # import the entries now -  this is currently reparsing the feed which is dumb
-                (ok,changed) = importFeed(ns,ret.content)
+                (ok,changed) = import_feed(ns,ret.content, content_type)
                 
                 # TODO: Check the OK return val?  Surely that's a good idea
                 
