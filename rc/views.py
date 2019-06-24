@@ -179,7 +179,9 @@ def feed(request,key):
     r["Content-Type"] = "application/rss+xml"
 
     al.return_code = 200 
-    al.save()       
+    al.save()      
+    
+     
 
 
     return r
