@@ -43,7 +43,7 @@ def index(request):
     if "feed" in request.GET:
         vals["feed"] = request.GET["feed"]
 
-    vals["popular"] = Source.objects.all().order_by("?")[:6]
+    vals["popular"] = Source.objects.exclude(image_url=None).order_by("?")[:6]
 
     return render(request, "index.html",vals)
 
