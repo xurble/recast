@@ -7,7 +7,7 @@
             <img class="pull-right feed-art" src="{{source.image_url}}" alt="Logo" onerror="imgError(this);">
             <h2>{{source.name}}</h2>
 
-            <p class="description">{{source.description|safe|default_if_none:""}}</p>
+            <p class="description">{{source.description|default_if_none:""|safe }}</p>
 
             <p><a href="{{source.site_url}}">Show Homepage</a></p>
             
