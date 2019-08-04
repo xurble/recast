@@ -48,11 +48,8 @@
                     {% for f in popular %}
         
                         <li>
-                            <a title="{{f.display_name}}" href="{{f.best_link }}"><img src="{{f.image_url}}" alt="{{f.display_name}}" onerror="imgError(this);"></a>
-                            <form method="post" onsubmit="return false;">
-                                <input type="hidden" name="feed" id="feed-s{{f.id}}" value="{{f.feed_url}}">
-                                <a href="#" onclick="addFeed('s{{f.id}}')" class="btn btn-success btn-sm" style="margin:3px;">Get Link</a>
-                            </form>
+                            <a title="{{f.display_name}}" href="{% url 'source' f.id %}"><img src="{{f.image_url}}" alt="{{f.display_name}}" onerror="imgError(this);"></a><br>
+                            <a href="{% url 'source' f.id %}"  class="btn btn-success btn-sm" style="margin:3px;">Recast</a>
                         </li>
         
                     {% endfor %}

@@ -27,7 +27,7 @@ urlpatterns = [
 
 
     url(r'^source/(?P<sid>.*)/revive/$',revivesource),
-    url(r'^source/(?P<sid>.*)/$',source),
+    url(r'^source/(?P<sid>.*)/$',source, name='source'),
     
     url(r'^feed/(?P<key>.*)/$',feed),
 
@@ -47,19 +47,3 @@ urlpatterns = [
     
 ]
 
-"""
-    (r'^allfeeds/$', allfeeds'),
-    (r'^importopml/$', importopml'),
-    (r'^accounts/login',loginpage'),
-    (r'^read/(?P<fid>.*)/(?P<qty>.*)/',readfeed'),
-
-
-    
-    (r'^subscription/(?P<sid>.*)/unsubscribe/$',unsubscribefeed'),
-    (r'^subscription/(?P<sid>.*)/details/$',subscriptiondetails'),
-    (r'^subscription/(?P<sid>.*)/promote/$',promote'),
-    (r'^subscription/(?P<sid>.*)/addto/(?P<tid>.*)/$',addto'),
-
-
-    (r'^feed/(?P<fid>.*)/kill/$',killfeed'),
-"""

@@ -6,10 +6,13 @@
         <div class="col-sm-12">
             <img class="pull-right feed-art" src="{{subscription.source.image_url}}" alt="Logo" onerror="imgError(this);">
             <h2>{{subscription.source.name}}</h2>
-            <p> <a href="{{subscription.source.site_url}}">Show Homepage</a> - 
-                <a href="/feed/{{subscription.key}}/">Recast Link</a> - 
-                <a href="{{subscription.source.feed_url}}">Original Feed Link</a>
+            <p class="description">{{subscription.source.description|safe}}</p>
+
+            <p> <a href="{{subscription.source.site_url}}">Show Homepage</a> &mdash;
+                <a href="/feed/{{subscription.key}}/">Recast Link</a> 
             </p>
+
+
 
             <p>This recast is updated every {{subscription.frequency}} days.  The next episode will drop <span id="countdown-holder">{{subscription.next_send_date}} (GMT)</span>.</p>
         
@@ -39,9 +42,11 @@
                         {% if e.index == subscription.last_sent %}class="current"{% endif %}
             
             
-                    ><td>{{e.index}}</td><td>{{e.title}}</td><td>{{e.created|date}}</td></tr>
+                    ><td><a href="{{e.link}}">{{e.title}}</a></td><td>{{e.created|date}}</td></tr>
                 {% endfor %}
             </table>
+
+            <br><br>
         </div>
     </div>
 </div>

@@ -207,7 +207,7 @@ def editfeed(request,key):
         
         sub.save()
         
-    vals["episodes"] = list(sub.source.post_set.filter(index__gt=(sub.last_sent-5)).filter(index__lt=(sub.last_sent+5)))
+    vals["episodes"] = list(sub.source.post_set.filter(index__gt=(sub.last_sent-5)))
     
 
     return render(request,"feed.html",vals)
@@ -251,7 +251,7 @@ def revivesource(request,sid):
         
         return HttpResponse("OK")
         
-@login_required
+
 def source(request,sid):
     
     vals = {}

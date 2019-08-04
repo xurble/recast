@@ -6,21 +6,43 @@
         <div class="col-sm-12">
             <img class="pull-right feed-art" src="{{source.image_url}}" alt="Logo" onerror="imgError(this);">
             <h2>{{source.name}}</h2>
-            <p><a href="{{source.site_url}}">Show Homepage</a> - <a href="{{source.feed_url}}">Show Feed</a></p>
+
+            <p class="description">{{source.description|safe}}</p>
+
+            <p><a href="{{source.site_url}}">Show Homepage</a></p>
+            
 
         </div>
     </div>
     <div class="row">
         <div class="col-sm-6">
-            <h3>Episodes</h3>
+            <h3>Recastable Episodes</h3>
         
             <table class="episode-list">
                 {% for p in source.post_set.all %}
-                    <tr><td>{{p.index}}</td><td>{{p.title}}</td><td>{{p.created|date}}</td></tr>
+                    <tr><td><a href="{{p.link}}">{{p.title}}</a></td><td>{{p.created|date}}</td></tr>
                 {% endfor %}
             </table>
+            <br><br>
         </div>
         <div class="col-sm-6">
+        
+            <h3>Recast this Podcast</h3>
+            <a href="#" onclick="addFeed()" class="btn btn-primary">Get Recast Link</a>
+
+            <div id="working" style="display:none">
+                <h2>Working</h2>
+                <img src='/static/images/loader.gif' alt='Loading' width='32' height="32">
+                </div>
+            <div id="addresult"     style="display:none"> 
+                <h2>Feeds</h2>
+                <ul id="addfeedlist">
+                </ul>
+            </div>
+
+        
+        
+            {% if user.is_superuser %}
             <h3>Subscriptions</h3>
         
             <table class="episode-list">
@@ -41,11 +63,38 @@
                     <tr><td colspan="4" class="ua">{{s.accesslog_set.all.0.user_agent}} ({{s.accesslog_set.all.0.return_code}})</td></tr>
                 {% endfor %}
             </table>
+            
+            
+            {% endif %}
         </div>
     </div>
 </div>
 
+{% csrf_token %}
 
+<script>
+
+function addFeed()
+{
+	var theFeed = '{{source.feed_url}}';
+    
+    $("#working").fadeIn(function(){
+
+        $.post("/addfeed/", { feed:theFeed }, function(data){
+
+            $("#working").fadeOut(function(){
+                $("#addresult").html(data).fadeIn();
+            });
+
+        },'html');
+
+    });
+	
+	
+	
+}
+
+</script>
 
 
 {% endblock %}
