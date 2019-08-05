@@ -28,6 +28,12 @@
         
           ga('create', 'UA-56790850-1', 'auto');
           ga('send', 'pageview');
+
+          {% if not debug %}
+            if (window.location.protocol != "https:") {
+                window.location.protocol = "https";
+            }
+          {% endif %}
         
         </script>
         
@@ -38,7 +44,7 @@
         {% endblock %}
 	</head>
 	<body>
-
+	
         <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
           <div class="container">
             <div id="topbar">

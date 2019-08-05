@@ -44,11 +44,13 @@ def index(request):
         vals["feed"] = request.GET["feed"]
 
     vals["popular"] = Source.objects.exclude(image_url=None).order_by("?")[:6]
-
+    
     return render(request, "index.html",vals)
 
+    
 
 def help(request):
+
     return render(request, "help.html",{} )
 
     
