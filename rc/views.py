@@ -274,7 +274,6 @@ def addfeed(request):
         if request.method == "GET":
             raise PermissionDenied()
         elif request.method == "POST":
-            import pdb; pdb.set_trace()
             
             source = None
             proxies = None
