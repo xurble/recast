@@ -29,7 +29,15 @@
             	{% for f in feeds %}
             		<tr style="{{f.garden_style}}">
             		    <td style="text-align:center">{{f.num_subs}}</td>
-            			<td><a href="/source/{{f.id}}/"><img src="/static/images/recast-small.png" alt="Feed" width="32"></a> <a href="{{f.best_link|escape}}">{{f.display_name}}</a> (<a href="{{f.feed_url|escape}}">feed</a>)</td>
+            			<td>
+            			    <a href="/source/{{f.id}}/"><img src="/static/images/recast-small.png" alt="Feed" width="32"></a> 
+            			    <a href="{{f.best_link|escape}}">{{f.display_name}}</a> 
+            			    (<a href="{{f.feed_url|escape}}">feed</a>)
+            			    
+            			    {% if f.is_cloudflare %}
+            			        😡
+            			    {% endif %}            			    
+            			</td>
             			<td style="text-align:right">{{f.max_index}}</td>
             			<td style="text-align:right">{{f.interval|hoursmins}}</td>
             			<td>{% if f.last_success %}{{f.last_success|timesince}} ago{% else %}Never{% endif %}</td>
