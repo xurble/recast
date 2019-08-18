@@ -27,6 +27,8 @@ INTERNAL_IPS = (
     "127.0.0.1",
 )
 
+
+
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
 # although not all choices may be available on all operating systems.
@@ -107,6 +109,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # 'smart_cache_control.middleware.SmartCacheControlMiddleware',
 ]
 
 ROOT_URLCONF = 'recast.urls'
@@ -138,8 +141,14 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
+    'smart_cache_control',
     'rc',
     'feeds',
+)
+
+
+SCC_CUSTOM_URL_CACHE = (
+    (r'/$', 'private', 0),
 )
 
 # A sample logging configuration. The only tangible logging

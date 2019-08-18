@@ -72,11 +72,15 @@ function addFeed(fid)
     
             $("#working").fadeIn(function(){
     
-                $.post("/addfeed/", { feed:theFeed }, function(data){
-    
-                    $("#working").fadeOut(function(){
-                        $("#addresult").html(data).fadeIn();
-                    });
+                $.post("/addfeed/", { feed:theFeed, ajax: "yep" }, function(data){
+                    if (data[0] == '{') { // oh the cheese
+                        document.location.href = JSON.parse(data)['feed'];                    
+                    }
+                    else {
+                        $("#working").fadeOut(function(){
+                            $("#addresult").html(data).fadeIn();
+                        });
+                    }
     
                 },'html');
     

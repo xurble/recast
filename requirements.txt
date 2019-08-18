@@ -9,10 +9,11 @@ beautifulsoup4==4.7.1
 certifi==2019.6.16        # via requests
 chardet==3.0.4            # via requests
 django-feed-reader==0.1.0
+django-smartcc==0.1.2
 django==2.2.4
 feedparser==5.2.1
 idna==2.8                 # via requests
-mysqlclient==1.4.2.post1
+mysqlclient==1.4.4
 pyrfc3339==1.1            # via django-feed-reader
 pytz==2019.2              # via django, pyrfc3339
 requests==2.22.0

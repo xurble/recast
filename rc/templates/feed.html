@@ -1,38 +1,82 @@
 {% extends "base.html" %}
+{% block head %}
+    <script src="/static/js/clipboard-polyfill.js"></script>
+{% endblock  %}
+
+
+{% block title %}{{subscription.source.name}} | {% endblock %}
 
 {% block content %}
 <div class="container">
+
     <div class="row">
         <div class="col-sm-12">
             <img class="pull-right feed-art" src="{{subscription.source.image_url}}" alt="Logo" onerror="imgError(this);">
-            <h2>{{subscription.source.name}}</h2>
+            <h2>Your Recast of &lsquo;{{subscription.source.name}}&rsquo;</h2>
+
             <p class="description">{{subscription.source.description|default_if_none:""|safe }}</p>
 
-            <p> <a href="{{subscription.source.site_url}}">Show Homepage</a> &mdash;
-                <a href="/feed/{{subscription.key}}/">Recast Link</a> 
+            <p> 
+                <a href="{{subscription.source.site_url}}">Show Homepage</a>
             </p>
+            
+
+        </div>
+    </div>
 
 
 
-            <p>This recast is updated every {{subscription.frequency}} days.  The next episode will drop <span id="countdown-holder">{{subscription.next_send_date}} (GMT)</span>.</p>
-        
+
+
+    <div class="row">
+
+
+
+
+
+
+        <div class="col-sm-6">
+            <h3>Feed</h3>
+            
+            <p>
+                The unique feed for this Recast is:<br>
+                <a href="/feed/{{subscription.key}}/">https://{{ host }}/feed/{{ subscription.key }}/</a>  
+                &nbsp;<a class="btn btn-xs btn-primary js-copy" href='#' title="Copy to clipboard"><i class="fas fa-copy"></i>  Copy</a>
+            </p>
+            <p>
+                Copy and Paste it to your podcast player of choice.
+            </p>
             <br>
+            <h3>Schedule</h3>
+            
+            <p>
             <form method="POST">
-                <input type="submit" name="release" value="Release Next Episode" class="btn btn-primary btn-sm">
-            </form>
-            <hr>
-            <h3>Frequency</h3>
-            <form method="POST">
-                <label for="frequency">New episodes every</label>
+                <label class="nobold" for="frequency">New episodes a released every</label>
                     <select name="frequency" id="frequency">
                         {% for d in days %}
                             <option value="{{d}}" {% if d == subscription.frequency %}selected{% endif %}>{{d}}</option>
                         {% endfor %}
                 </select>
-                <label for="frequency">days.</label>
-                <input type="submit" value="Update Frequency" class="btn btn-sm btn-primary">
+                <label class="nobold" for="frequency">days.</label>
+                <input type="submit" value="Update Frequency" class="btn btn-xs btn-primary">
             </form>
-            <hr>
+            
+            </p>
+
+            <p>The next episode will drop <span id="countdown-holder">{{subscription.next_send_date}} (GMT)</span>.</p>
+
+            <p>
+                <form method="POST">
+                    <input type="submit" name="release" value="Release Next Episode Now" class="btn btn-primary btn-xs">
+                </form>
+            </p>
+            
+            <p>
+                There is a link to this page in every episode, so you can change these settings at any time.</p>
+            </p>
+        </div>
+        <div class="col-sm-6">
+
             <h3>Episodes</h3>
         
             <table class="episode-list">
@@ -50,6 +94,22 @@
         </div>
     </div>
 </div>
+
+
+    <script>
+    
+    $(".js-copy").on("click", function(){
+    
+    
+        clipboard.writeText("https://{{ host }}/feed/{{ subscription.key }}/");
+    
+    
+    });
+
+
+    </script>
+ 
+
 
 
 

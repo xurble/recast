@@ -1,15 +1,16 @@
 # Create your views here.
 
 from django.shortcuts import get_object_or_404, render
-from django.contrib.auth import authenticate, login,get_user
-from django.http import HttpResponseRedirect,HttpResponse,HttpResponseNotModified,HttpResponseForbidden
-from django.db.models import Q
-from django.db.models import F
+from django.http import HttpResponseRedirect, HttpResponse, HttpResponseNotModified, JsonResponse
+from django.db.models import Q, F
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from feeds.utils import update_feeds, import_feed
+from django.urls import reverse
+from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 
 import datetime 
 import hashlib
@@ -211,6 +212,8 @@ def editfeed(request,key):
         
     vals["episodes"] = list(sub.source.post_set.filter(index__gt=(sub.last_sent-5)))
     
+    vals["host"] = request.META["HTTP_HOST"]
+    
 
     return render(request,"feed.html",vals)
         
@@ -235,6 +238,7 @@ def feedgarden(request):
     vals = {}
     vals["feeds"] = Source.objects.all().order_by("due_poll")
     return render(request,'feedgarden.html',vals)
+    
     
 @login_required
 def revivesource(request,sid):
@@ -261,11 +265,12 @@ def source(request,sid):
     return render(request, 'source.html',vals)
 
 
+@csrf_exempt
 def addfeed(request):
 
     try:
         if request.method == "GET":
-            return HttpResponseForbidden("No!")  # TODO: PermissionDenied
+            raise PermissionDenied()
         elif request.method == "POST":
     
             feed = request.POST["feed"]
@@ -313,7 +318,7 @@ def addfeed(request):
                                 name = l['title']
                             except Exception as ex:
                                 name = "Feed %d" % feedcount
-                            rethtml += '<li><form method="post" onsubmit="return false;"> <input type="hidden" name="feed" id="feed-%d" value="%s"><a href="#" onclick="addFeed(%d)" class="btn btn-success">Subscribe</a> - %s</form></li>' % (feedcount,urljoin(feed,l['href']),feedcount,name)
+                            rethtml += '<li><form method="post" action="/addfeed/"> <input type="hidden" name="feed" value="%s"><input type="submit" class="btn btn-success btn-xs" value="Recast"> - %s</form></li>' % (urljoin(feed,l['href']) ,name)
                             feed = urljoin(feed,l['href']) # store this in case there is only one feed and we wind up importing it
                             #TODO: need to accout for relative URLs here
                 #if feedcount == 1:
@@ -327,89 +332,59 @@ def addfeed(request):
                     return HttpResponse("<h2>Available Feeds</h2><ul id='addfeedlist' class='feedlist'>" + rethtml + "</ul>")
                 
             if isFeed:
+                try:
+                    s = Source.objects.filter(feed_url__iexact = feed)[0]
+                except Exception  as ex:
 
-                s = Source.objects.filter(feed_url = feed)
-                if s.count() > 0:
-                    #feed already exists  # create a subscription to it
-                    s = s[0]
-                    
-                    sub = Subscription(source=s,key=uuid.uuid4(),name=s.display_name)
-                    sub.last_sent_date = datetime.datetime.utcnow()
-                    sub.save()                        
-
-                    s.num_subs = s.subscription_set.count()
-                    s.save()
-                
-                    feedLink = "http://%s/feed/%s/" % (request.META["HTTP_HOST"],sub.key)
-
-                    return HttpResponse("""
-                        <h2>Success!</h2>
-                        
-                        <p>Here is your Recast of %s: <a href='%s'>%s</a></p>
-                        
-                        <p>You can subscribe to this link now in any podcast app.</p>
-
-                        <p>A link to the Recast settings will be added to every episode in case you want to change them in the future.</p>
-                        
-                        <p><a href="%sedit/">Or you can change them right now.</a></p>
-                        
-                        <p>Happy listening!</p>
-                        
-                        """ % (sub.name,feedLink,feedLink, feedLink))
-
-
-                # need to start checking feed parser errors here
-                ns = Source()
-                ns.due_poll = datetime.datetime.utcnow()            
+                    # need to start checking feed parser errors here
+                    s = Source()
+                    s.due_poll = datetime.datetime.utcnow()            
             
                     
-                ns.name = feed
-                try:
-                    ns.html_url = ff.feed.link
-                    ns.name = ff.feed.title
-                except Exception as ex:
-                    pass
-                ns.feed_url = feed
-                ns.num_subs = 1
-                ns.save()
+                    s.name = feed
+                    try:
+                        s.html_url = ff.feed.link
+                        s.name = ff.feed.title
+                    except Exception as ex:
+                        pass
+                    s.feed_url = feed
+                    s.num_subs = 0
+                    s.save()
                 
 
-                # import the entries now -  this is currently reparsing the feed which is dumb
-                (ok,changed) = import_feed(ns,ret.content, content_type)
+                    # import the entries now
+                    (ok,changed) = import_feed(s, ret.content, content_type)
                 
                 # TODO: Check the OK return val?  Surely that's a good idea
                 
-                ns.last_change = datetime.datetime.utcnow()
+                    s.last_change = datetime.datetime.utcnow()
                 
-                ns.save()
+                    s.save()
 
-            
-                sub = Subscription(source=ns,key=uuid.uuid4(),name=ns.display_name)
-                sub.last_sent_date = datetime.datetime.utcnow()
-                
-                sub.save()
-                
-                feedLink = "http://%s/feed/%s/" % (request.META["HTTP_HOST"],sub.key)
-
-                # TODO: this is duplicate code
-                return HttpResponse("""
-                        <h2>Success!</h2>
-                        
-                        <p>Here is your Recast of %s: <a href='%s'>%s</a></p>
-                        
-                        <p>You can subscribe to this link now in any podcast app.</p>
-
-                        <p>A link to the Recast settings will be added to every episode in case you want to change them in the future.</p>
-                        
-                        <p><a href="%sedit/">Or you can change them right now.</a></p>
-                        
-                        <p>Happy listening!</p>
-                        
-                        """ % (sub.name,feedLink,feedLink, feedLink))
-                        
+                if request.POST.get("ajax", "nope") == "yep":
+                    return JsonResponse({"feed": reverse("source", args=[s.id])})            
+                else:
+                    return HttpResponseRedirect(reverse("source", args=[s.id]))          
                         
     except Exception as xx:
         return HttpResponse("<div>Error %s: %s</div>" % (xx.__class__.__name__,str(xx)))
+        
+        
+def subscribe(request, sid):
+
+    if request.method == "POST":
+        s = get_object_or_404(Source,   id=int(sid))
+
+        sub = Subscription(source=s,key=uuid.uuid4(),name=s.display_name)
+        sub.last_sent_date = datetime.datetime.utcnow()
+        sub.save()                        
+
+        s.num_subs = s.subscription_set.count()
+        s.save()
+        
+        messages.success(request, "Your new Recast feed has been created - subscribe to the link below in your Podcast App.")
+
+        return HttpResponseRedirect(reverse("editfeed", args=[sub.key]))
 
 
 def reader(request):

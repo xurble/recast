@@ -1,19 +1,22 @@
 <!doctype html>
 <html>
 	<head>
-		<title>Recast - The Simple Podcast Catch-Up Service</title>
+		<title>{% block title %}{% endblock %}Recast - The Simple Podcast Catch-Up Service</title>
 		
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">		
 
         <meta name="description" content="A service to replay podcast feeds from the start.">
         <meta name="keywords" content="podcast feed catch-up replay rebroadcast">
 
- 		<script type="text/javascript" src="/static/js/jquery-1.11.1.js"></script>
+ 		<script type="text/javascript" src="/static/js/jquery-3.4.1.min.js"></script>
 
 
 		<link href="/static/css/bootstrap.min.css" rel="stylesheet"	type="text/css">
 		<link href="/static/css/recast.css" rel="stylesheet" type="text/css">
 		
+        <script src="https://kit.fontawesome.com/cd9a113456.js"></script>
+
+
 		<link rel="shortcut icon" href="/static/images/recast-small.png">
         <link rel="apple-touch-icon" href="/static/images/touch.png">
 
@@ -53,14 +56,34 @@
                   <img src="/static/images/logo-trans.png" style="max-height:32px;margin-top:-6px;" alt="Recast Logo">
                   Recast
                </a>
-               
+
+
                <a href="/help/" class="navbar-link" style="float:right">Help</a>
+
+
+                {% if user.is_superuser %}
+                   <a href="/feedgarden/" class="navbar-link" style="float:right">Garden&nbsp;&nbsp;</a>
+                {% endif %}
+
+
             </div>
+
           </div>
         </nav>
 
 
+        {% if messages %}
+            
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} " role="alert">
+                    
+                    {{message|safe}}
 
+                </div>
+
+            {% endfor %}
+
+        {% endif %}   
 
         {% block content %}
 

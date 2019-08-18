@@ -23,20 +23,23 @@ urlpatterns = [
     url(r'^refresh/$', reader),
     url(r'^help/$', help),
 
-    url(r'^feed/(?P<key>.*)/edit/$',editfeed),
+    url(r'^feed/(?P<key>.*)/edit/$', editfeed), # legacy
+    url(r'^feed/edit/(?P<key>.*)/$', editfeed, name='editfeed'),
+    url(r'^feed/(?P<key>.*)/$', feed, name='feed'),
 
+    url(r'^source/(?P<sid>.*)/revive/$', revivesource),
+    url(r'^source/(?P<sid>.*)/subscribe/$', subscribe, name='subscribe'),
+    url(r'^source/(?P<sid>.*)/$', source, name='source'),
 
-    url(r'^source/(?P<sid>.*)/revive/$',revivesource),
-    url(r'^source/(?P<sid>.*)/$',source, name='source'),
     
-    url(r'^feed/(?P<key>.*)/$',feed),
 
 
-    url(r'^post/(?P<pid>.*)/$',post_redirect),
-    url(r'^enclosure/(?P<eid>.*)/$',enclosure_redirect),
+    url(r'^post/(?P<pid>.*)/$', post_redirect),
+    url(r'^enclosure/(?P<eid>.*)/$', enclosure_redirect),
 
 
     url(r'^addfeed/$', addfeed),
+    
 
     url(r'^feedgarden/$', feedgarden),
 

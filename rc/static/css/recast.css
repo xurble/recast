@@ -124,6 +124,10 @@ a.logo, h1, h2, h3 {
 	font-weight: normal !important;
 }
 
+h2 {
+    margin-top: 40px;
+}
+
 h1, .jumbotron h1 {
     font-size:48px;
 }
@@ -160,6 +164,9 @@ td.ua {
     
 }
 
+div.alert {
+    text-align:center;
+}
 
 #gardentable, #gardentable td,#gardentable th {
 	border:1px solid #CCC;
@@ -179,4 +186,9 @@ div.location {
     height:12px;
     width:12px;
     border: 1px solid #999;
+}
+
+
+label.nobold {
+    font-weight: normal;
 }
