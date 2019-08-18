@@ -60,6 +60,8 @@
     
 <script>
 
+var cloudflare = 'no';
+
 function addFeed(fid)
 {
 	var theFeed = $("#feed-" + fid).val();
@@ -72,9 +74,26 @@ function addFeed(fid)
     
             $("#working").fadeIn(function(){
     
-                $.post("/addfeed/", { feed:theFeed, ajax: "yep" }, function(data){
+                $.post("/addfeed/", { feed:theFeed, ajax: "yep", cloudflare: cloudflare }, function(data){
                     if (data[0] == '{') { // oh the cheese
-                        document.location.href = JSON.parse(data)['feed'];                    
+                        data = JSON.parse(data)
+                        if(data["ok"]) {
+                            document.location.href = data['feed'];  
+                        }
+                        else {
+                            console.log("Boo! - " + data["reason"]);
+                            
+                            if (data["reason"] == "cloudflare") {
+                                cloudflare = 'yes'
+                                msg = data["msg"];
+                            }
+                            else {
+                                msg = data["msg"];
+                            }
+                            $("#working").fadeOut(function(){
+                                $("#addresult").html(msg).fadeIn();
+                            });
+                        }
                     }
                     else {
                         $("#working").fadeOut(function(){
