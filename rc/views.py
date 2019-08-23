@@ -83,7 +83,7 @@ def feed(request,key):
     al = AccessLog(raw_id = key,return_code = 410,ip_address = request.META["REMOTE_ADDR"],user_agent=request.META["HTTP_USER_AGENT"])
     al.save()
     try:
-        sub =Subscription.objects.get(key=key)
+        sub = Subscription.objects.get(key=key)
     except:
         return HttpResponse(status=410)  # let's assume that a feed that doesn't exist has been deleted
                                          # I mean it could be mistype, but most likely not.
@@ -156,8 +156,8 @@ def feed(request,key):
         
 
     sub.save()
-
-    return_etag = "%d-%d" % (sub.id,last_sent)
+    
+    return_etag = '"%d-%d"' % (sub.id, last_sent)
     
     if return_etag == browser_etag:
         al.return_code = 304 
@@ -180,7 +180,7 @@ def feed(request,key):
     
     r = render(request, "rss.xml",vals)
     
-    r["ETag"] = return_etag
+    r["ETag"] = 'W/' + return_etag
     #r["Content-Type"] = "text/plain"
     r["Content-Type"] = "application/rss+xml"
 
