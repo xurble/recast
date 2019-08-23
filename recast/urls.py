@@ -46,6 +46,7 @@ urlpatterns = [
     
 
     url('^robots.txt$', robots),
+    url('^favicon.ico$', favicon),
 
     
 ]

@@ -1,4 +1,6 @@
 
+_staticfiles/
+
 *.pyc
 
 server_settings.py

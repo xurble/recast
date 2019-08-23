@@ -1,7 +1,7 @@
 # Create your views here.
 
 from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponseRedirect, HttpResponse, HttpResponseNotModified, JsonResponse
+from django.http import HttpResponseRedirect, HttpResponse, HttpResponseNotModified, JsonResponse, HttpResponsePermanentRedirect
 from django.db.models import Q, F
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -67,6 +67,9 @@ Disallow: /static/
     r["Content-Type"] = "text/plain"
     
     return r
+    
+def favicon(request):
+    return HttpResponsePermanentRedirect('/static/images/recast-small.png')
 
 
 
@@ -270,10 +273,10 @@ def addfeed(request):
 
     proxy = None
 
-    try:
-        if request.method == "GET":
-            raise PermissionDenied()
-        elif request.method == "POST":
+    if request.method == "GET":
+        raise PermissionDenied()
+    elif request.method == "POST":
+        try:
             
             source = None
             proxies = None
@@ -382,17 +385,17 @@ def addfeed(request):
             
                 source.name = feed
                 try:
-                    source.html_url = ff.feed.link
+                    source.site_url = ff.feed.link
                     source.name = ff.feed.title
                 except Exception as ex:
                     pass
-                source.site_url = feed
+                source.feed_url = feed
                 source.num_subs = 0
                 source.save()
         
 
                 # import the entries now
-                (ok,changed) = import_feed(s, ret.content, content_type)
+                (ok,changed) = import_feed(source, ret.content, content_type)
         
             # TODO: Check the OK return val?  Surely that's a good idea
         
@@ -405,10 +408,10 @@ def addfeed(request):
             else:
                 return HttpResponseRedirect(reverse("source", args=[source.id]))          
                         
-    except Exception as xx:
-        if proxy:
-            proxy.delete()
-        return JsonResponse({"ok": False, "reason": str(xx), "msg": "Recast could not connect to the podcast server.  You can try again, it might work 🤷‍."})
+        except Exception as xx:
+            if proxy:
+                proxy.delete()
+            return JsonResponse({"ok": False, "reason": str(xx), "msg": "Recast could not connect to the podcast server.  You can try again, it might work 🤷‍."})
         
         
 def subscribe(request, sid):
