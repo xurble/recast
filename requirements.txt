@@ -4,19 +4,18 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
-
-beautifulsoup4==4.7.1
+beautifulsoup4==4.7.1     # via -r requirements.in, django-feed-reader
 certifi==2019.6.16        # via requests
 chardet==3.0.4            # via requests
-django-feed-reader==0.1.2
-django-smartcc==0.1.2
-django==2.2.4
-feedparser==5.2.1
+django-feed-reader==0.1.2  # via -r requirements.in
+django-smartcc==0.1.2     # via -r requirements.in
+django==2.2.13            # via -r requirements.in, django-feed-reader
+feedparser==5.2.1         # via -r requirements.in, django-feed-reader
 idna==2.8                 # via requests
-mysqlclient==1.4.4
+mysqlclient==1.4.4        # via -r requirements.in
 pyrfc3339==1.1            # via django-feed-reader
-pytz==2019.2              # via django, pyrfc3339
-requests==2.22.0
+pytz==2019.2              # via django
+requests==2.22.0          # via -r requirements.in, django-feed-reader
 soupsieve==1.9.3          # via beautifulsoup4
 sqlparse==0.3.0           # via django
 urllib3==1.25.3           # via requests
