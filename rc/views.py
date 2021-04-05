@@ -11,6 +11,7 @@ from feeds.utils import update_feeds, import_feed, get_proxy
 from django.urls import reverse
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.utils.cache import patch_response_headers
 
 import datetime 
 import hashlib
@@ -187,8 +188,8 @@ def feed(request,key):
     al.return_code = 200 
     al.save()      
     
-     
-
+    # give cloudflare something to work with
+    patch_response_headers(r, cache_timeout=1800)
 
     return r
     
