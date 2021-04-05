@@ -86,8 +86,13 @@ def feed(request,key):
     try:
         sub = Subscription.objects.get(key=key)
     except:
-        return HttpResponse(status=410)  # let's assume that a feed that doesn't exist has been deleted
-                                         # I mean it could be mistype, but most likely not.
+
+        # give cloudflare something to work with
+        patch_response_headers(r, cache_timeout=(60 * 60 * 24 * 7))  # A week
+
+
+        r = HttpResponse("And like that, he's gone." status=410)  # let's assume that a feed that doesn't exist has been deleted
+        return r                               # I mean it could be mistype, but most likely not.
           
     al.subscription = sub
     al.return_code = 500
@@ -152,7 +157,15 @@ def feed(request,key):
                 al.return_code = 410    
                 al.save()
 
-                return HttpResponse(status=410)
+
+
+                # give cloudflare something to work with
+                patch_response_headers(r, cache_timeout=(60 * 60 * 24 * 7))  # A week
+
+
+                r = HttpResponse("And like that, he's gone." status=410)  
+                return r                               
+
             
         
 
