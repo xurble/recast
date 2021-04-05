@@ -181,7 +181,7 @@ def feed(request,key):
     
     r = render(request, "rss.xml",vals)
     
-    r["ETag"] = 'W/' + return_etag
+    #r["ETag"] = 'W/' + return_etag
     #r["Content-Type"] = "text/plain"
     r["Content-Type"] = "application/rss+xml"
 
@@ -189,7 +189,7 @@ def feed(request,key):
     al.save()      
     
     # give cloudflare something to work with
-    patch_response_headers(r, cache_timeout=1800)
+    patch_response_headers(r, cache_timeout=(60 * 60))
 
     return r
     
