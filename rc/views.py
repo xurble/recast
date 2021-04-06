@@ -91,7 +91,7 @@ def feed(request,key):
         patch_response_headers(r, cache_timeout=(60 * 60 * 24 * 7))  # A week
 
 
-        r = HttpResponse("And like that, he's gone." status=410)  # let's assume that a feed that doesn't exist has been deleted
+        r = HttpResponse("And like that, he's gone.", status=410)  # let's assume that a feed that doesn't exist has been deleted
         return r                               # I mean it could be mistype, but most likely not.
           
     al.subscription = sub
@@ -163,7 +163,7 @@ def feed(request,key):
                 patch_response_headers(r, cache_timeout=(60 * 60 * 24 * 7))  # A week
 
 
-                r = HttpResponse("And like that, he's gone." status=410)  
+                r = HttpResponse("And like that, he's gone.", status=410)  
                 return r                               
 
             
