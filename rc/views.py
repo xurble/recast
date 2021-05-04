@@ -227,7 +227,7 @@ def editfeed(request,key):
         
         sub.save()
         
-    vals["episodes"] = list(sub.source.post_set.filter(index__gt=(sub.last_sent-5)))
+    vals["episodes"] = list(sub.source.posts.filter(index__gt=(sub.last_sent-5)))
     
     vals["host"] = request.META["HTTP_HOST"]
     

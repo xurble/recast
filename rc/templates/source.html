@@ -67,7 +67,7 @@
             <h3>Recastable Episodes</h3>
         
             <table class="episode-list">
-                {% for p in source.post_set.all %}
+                {% for p in source.posts.all %}
                     <tr><td><a href="{{p.link}}">{{p.title}}</a></td><td>{{p.created|date}}</td></tr>
                 {% endfor %}
             </table>
