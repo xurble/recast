@@ -144,7 +144,7 @@ def feed(request,key):
                         "created_for_subscription": email.Utils.formatdate(float(sub.last_sent_date.strftime('%s')))  , 
                         "body":  "This Recast has come to an end.  If you have not already done so, you can get a link to the original source podcast feed from the settings link above.  You should subscribe to the original to continue listening to further episodes.  We hope you enjoyed using Recast.",
                         "id": "fin!",
-                        "enclosure_set" : {"all": [ {"recast_link":  "/static/audio/end.mp3",
+                        "enclosures" : {"all": [ {"recast_link":  "/static/audio/end.mp3",
                                                     "length": 94875,
                                                     "type": "audio/mpeg"  } ] },
                         "image_url": "http://" + request.META["HTTP_HOST"] + "/static/images/recast-large.png" ,
@@ -205,6 +205,7 @@ def feed(request,key):
     patch_response_headers(r, cache_timeout=(60 * 60))
 
     return r
+    
     
 @csrf_exempt
 def editfeed(request,key):
