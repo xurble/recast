@@ -80,9 +80,7 @@ def feed(request,key):
 
     
     right_now = timezone.now()
-
-    al = AccessLog(raw_id = key,return_code = 410,ip_address = request.META["REMOTE_ADDR"],user_agent=request.META["HTTP_USER_AGENT"])
-    al.save()
+    
     try:
         sub = Subscription.objects.get(key=key)
     except:
@@ -94,11 +92,10 @@ def feed(request,key):
         r = HttpResponse("And like that, he's gone.", status=410)  # let's assume that a feed that doesn't exist has been deleted
         return r                               # I mean it could be mistype, but most likely not.
           
-    al.subscription = sub
-    al.return_code = 500
-    al.save()
-    
+    sub.last_return_code = 500
     sub.last_accessed = right_now
+    sub.user_agent = request.META["HTTP_USER_AGENT"][:512]
+    sub.save()
 
     
     browser_etag = ""
@@ -153,11 +150,8 @@ def feed(request,key):
                 ]
             else:
                 # this sub is dead and gone and waiting for deletion
+                sub.last_return_code = 410    
                 sub.save()
-                al.return_code = 410    
-                al.save()
-
-
 
                 # give cloudflare something to work with
                 patch_response_headers(r, cache_timeout=(60 * 60 * 24 * 7))  # A week
@@ -168,15 +162,13 @@ def feed(request,key):
 
             
         
-
-    sub.save()
-    
     return_etag = '"%d-%d"' % (sub.id, last_sent)
     
     if return_etag == browser_etag:
-        al.return_code = 304 
-        al.save()       
+        sub.last_return_code = 304 
+        sub.save()       
         return HttpResponseNotModified()         
+
     
     vals = {}
     vals["subscription"] = sub
@@ -189,17 +181,16 @@ def feed(request,key):
     
     vals["posts"] += final_post
     
-    vals["url"] = "http://" + request.META["HTTP_HOST"] + request.path
-    vals["base_href"] = "http://" + request.META["HTTP_HOST"]
+    vals["url"] = "https://" + request.META["HTTP_HOST"] + request.path
+    vals["base_href"] = "https://" + request.META["HTTP_HOST"]
     
     r = render(request, "rss.xml",vals)
     
     #r["ETag"] = 'W/' + return_etag
-    #r["Content-Type"] = "text/plain"
     r["Content-Type"] = "application/rss+xml"
 
-    al.return_code = 200 
-    al.save()      
+    sub.last_return_code = 200 
+    sub.save()
     
     # give cloudflare something to work with
     patch_response_headers(r, cache_timeout=(60 * 60))
