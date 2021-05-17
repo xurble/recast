@@ -153,11 +153,12 @@ def feed(request,key):
                 sub.last_return_code = 410    
                 sub.save()
 
+
+                r = HttpResponse("And like that, he's gone.", status=410)  
+
                 # give cloudflare something to work with
                 patch_response_headers(r, cache_timeout=(60 * 60 * 24 * 7))  # A week
 
-
-                r = HttpResponse("And like that, he's gone.", status=410)  
                 return r                               
 
             
