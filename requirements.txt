@@ -4,8 +4,6 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
---trusted-host zoolibs.zoowebservices.com
-
 beautifulsoup4==4.7.1
     # via
     #   -r requirements.in
@@ -18,7 +16,7 @@ django-feed-reader==0.3.1
     # via -r requirements.in
 django-smartcc==0.1.2
     # via -r requirements.in
-django==2.2.20
+django==2.2.21
     # via
     #   -r requirements.in
     #   django-feed-reader
@@ -38,6 +36,8 @@ requests==2.25.1
     # via
     #   -r requirements.in
     #   django-feed-reader
+sgmllib3k==1.0.0
+    # via django-feed-reader
 soupsieve==2.2.1
     # via beautifulsoup4
 sqlparse==0.4.1
