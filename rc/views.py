@@ -13,6 +13,8 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.utils.cache import patch_response_headers
 
+import CloudFlare
+
 import datetime 
 import hashlib
 import logging
@@ -185,7 +187,7 @@ def feed(request,key):
     vals["url"] = "https://" + request.META["HTTP_HOST"] + request.path
     vals["base_href"] = "https://" + request.META["HTTP_HOST"]
     
-    r = render(request, "rss.xml",vals)
+    r = render(request, "rss.xml", vals)
     
     #r["ETag"] = 'W/' + return_etag
     r["Content-Type"] = "application/rss+xml"
@@ -200,9 +202,9 @@ def feed(request,key):
     
     
 @csrf_exempt
-def editfeed(request,key):
+def editfeed(request, key):
     
-    sub = get_object_or_404(Subscription,key=key)
+    sub = get_object_or_404(Subscription, key=key)
     vals = {}
     
     vals["subscription"] = sub
@@ -215,6 +217,29 @@ def editfeed(request,key):
             if sub.last_sent < sub.source.max_index:
                 sub.last_sent = sub.last_sent + 1
                 sub.last_sent_date = datetime.datetime.utcnow()
+
+                if settings.CLOUDFLARE_TOKEN:
+                    import pdb; pdb.set_trace()
+                
+                    domain = request.META["HTTP_HOST"]
+                    
+                    domain = "recastthis.com"
+                    
+                    url = 'https://{}{}'.format(domain, reverse("feed", args=[key]))
+                    
+                    
+                    cf = CloudFlare.CloudFlare(token=settings.CLOUDFLARE_TOKEN)
+
+                    r = cf.zones.purge_cache.post(
+                                settings.CLOUDFLARE_ZONE, 
+                                data={'files': [
+                                    url,
+                                ]                                
+                            })
+
+
+
+
         else:
             sub.frequency = int(request.POST["frequency"])
         

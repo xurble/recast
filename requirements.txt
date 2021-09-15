@@ -9,16 +9,19 @@
 beautifulsoup4==4.7.1
     # via
     #   -r requirements.in
+    #   cloudflare
     #   django-feed-reader
-certifi==2020.12.5
+certifi==2021.5.30
     # via requests
-chardet==4.0.0
+charset-normalizer==2.0.5
     # via requests
-django-feed-reader==0.3.1
+cloudflare==2.8.15
+    # via -r requirements.in
+django-feed-reader==1.0.0
     # via -r requirements.in
 django-smartcc==0.1.2
     # via -r requirements.in
-django==2.2.20
+django==2.2.24
     # via
     #   -r requirements.in
     #   django-feed-reader
@@ -26,21 +29,28 @@ feedparser==5.2.1
     # via
     #   -r requirements.in
     #   django-feed-reader
-idna==2.10
+idna==3.2
     # via requests
+jsonlines==2.0.0
+    # via cloudflare
 mysqlclient==2.0.3
     # via -r requirements.in
 pyrfc3339==1.1
     # via django-feed-reader
 pytz==2021.1
     # via django
-requests==2.25.1
+pyyaml==5.4.1
+    # via cloudflare
+requests==2.26.0
     # via
     #   -r requirements.in
+    #   cloudflare
     #   django-feed-reader
+sgmllib3k==1.0.0
+    # via django-feed-reader
 soupsieve==2.2.1
     # via beautifulsoup4
-sqlparse==0.4.1
+sqlparse==0.4.2
     # via django
-urllib3==1.26.4
+urllib3==1.26.6
     # via requests

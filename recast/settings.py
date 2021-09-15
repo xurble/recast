@@ -6,6 +6,8 @@ SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
 from recast import server_settings
 
+CLOUDFLARE_TOKEN = server_settings.CLOUDFLARE_TOKEN
+CLOUDFLARE_ZONE = server_settings.CLOUDFLARE_ZONE
 
 DEBUG = server_settings.DEBUG
 TEMPLATE_DEBUG = DEBUG
