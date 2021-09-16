@@ -219,11 +219,9 @@ def editfeed(request, key):
                 sub.last_sent_date = datetime.datetime.utcnow()
 
                 if settings.CLOUDFLARE_TOKEN:
-                    import pdb; pdb.set_trace()
                 
                     domain = request.META["HTTP_HOST"]
                     
-                    domain = "recastthis.com"
                     
                     url = 'https://{}{}'.format(domain, reverse("feed", args=[key]))
                     
