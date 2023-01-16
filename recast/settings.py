@@ -16,9 +16,11 @@ ADMINS = (
     # ('Your Name', 'your_email@example.com'),
 )
 
-FEEDS_USER_AGENT = "Recast/1.2"
+FEEDS_USER_AGENT = "Recast/1.3"
 FEEDS_SERVER = server_settings.FEEDS_SERVER
 FEEDS_CLOUDFLARE_WORKER = server_settings.FEEDS_CLOUDFLARE_WORKER
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MANAGERS = ADMINS
 
@@ -112,6 +114,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'rc.middleware.PreviewMiddleware'
     # 'smart_cache_control.middleware.SmartCacheControlMiddleware',
 ]
 
