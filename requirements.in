@@ -1,8 +1,7 @@
-Django~=2.2
+Django~=3.2.1
 requests~=2.22
 mysqlclient
 beautifulsoup4==4.7.1
-feedparser==5.2.1
 django-feed-reader
 django-smartcc~=0.1.2
 cloudflare~=2.8.15
