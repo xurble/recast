@@ -23,7 +23,7 @@ django==3.2.16
     # via
     #   -r requirements.in
     #   django-feed-reader
-django-feed-reader==1.0.3
+django-feed-reader==1.0.4
     # via -r requirements.in
 django-smartcc==0.1.2
     # via -r requirements.in
