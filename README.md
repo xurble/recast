@@ -43,16 +43,9 @@ put the url into the following setting.
 * `FEEDS_CLOUDFLARE_WORKER` -  The url to your cloudflare worker if you are using them e.g. `https://foo.bar.workers.dev`
 
 
+### Updating feeds
 
-
-
-
-
-
-
-
-
-Once it is running, in order to keep it ticking over and reading feeds you need to periodically call `manage.py refreshfeeds`
+Once Recast is running, in order to keep it ticking over and reading feeds you need to periodically call `manage.py refreshfeeds`
 
 I have a cron job that does this every 10 minutes.  
 
