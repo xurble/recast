@@ -42,20 +42,20 @@ import requests
  
 def index(request):
 
-    vals = {}
-    
     if "feed" in request.GET:
-        vals["feed"] = request.GET["feed"]
+        request.vals["feed"] = request.GET["feed"]
 
-    vals["popular"] = Source.objects.exclude(image_url=None).order_by("?")[:6]
+    request.vals["popular"] = Source.objects.exclude(image_url=None).order_by("?")[:6]
     
-    return render(request, "index.html",vals)
+    return render(request, "index.html", request.vals)
 
     
 
 def help(request):
 
-    return render(request, "help.html",{} )
+    request.vals["page_title"] = "Help"
+    
+    return render(request, "help.html", request.vals )
 
     
 def robots(request):
@@ -205,10 +205,19 @@ def feed(request,key):
 def editfeed(request, key):
     
     sub = get_object_or_404(Subscription, key=key)
-    vals = {}
+
+
+    s = sub.source
+    request.vals["source"] = s
+    request.vals["page_title"] = "A Recast of " + s.name
+    if s.description:
+        request.vals["page_description"] = s.description
+    if s.image_url:
+        request.vals["page_image"] = s.image_url
     
-    vals["subscription"] = sub
-    vals["days"] = list(range(1,15))
+    
+    request.vals["subscription"] = sub
+    request.vals["days"] = list(range(1,15))
     
     
     if request.method == "POST":
@@ -243,12 +252,12 @@ def editfeed(request, key):
         
         sub.save()
         
-    vals["episodes"] = list(sub.source.posts.filter(index__gt=(sub.last_sent-5)))
+    request.vals["episodes"] = list(sub.source.posts.filter(index__gt=(sub.last_sent-5)))
     
-    vals["host"] = request.META["HTTP_HOST"]
+    request.vals["host"] = request.META["HTTP_HOST"]
     
 
-    return render(request,"feed.html",vals)
+    return render(request,"feed.html", request.vals)
         
 
 
@@ -293,9 +302,14 @@ def revivesource(request,sid):
 
 def source(request,sid):
     
-    vals = {}
-    vals["source"] = get_object_or_404(Source,id=int(sid))
-    return render(request, 'source.html',vals)
+    s = get_object_or_404(Source,id=int(sid))
+    request.vals["source"] = s
+    request.vals["page_title"] = "A Recast of " + s.name
+    if s.description:
+        request.vals["page_description"] = s.description
+    if s.image_url:
+        request.vals["page_image"] = s.image_url
+    return render(request, 'source.html', request.vals)
 
 
 @csrf_exempt
