@@ -1,5 +1,5 @@
 from django.urls import path, include
-from django.conf.urls import url
+
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -19,34 +19,34 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
 
-    url(r'^$', index),
-    url(r'^refresh/$', reader),
-    url(r'^help/$', help),
+    path(r'', index),
+    path(r'refresh/', reader),
+    path(r'help/', help),
 
-    url(r'^feed/(?P<key>.*)/edit/$', editfeed), # legacy
-    url(r'^feed/edit/(?P<key>.*)/$', editfeed, name='editfeed'),
-    url(r'^feed/(?P<key>.*)/$', feed, name='feed'),
+    path('feed/(<str:key>)/edit/', editfeed), # legacy
+    path('feed/edit/<str:key>/', editfeed, name='editfeed'),
+    path('feed/<str:key>/', feed, name='feed'),
 
-    url(r'^source/(?P<sid>.*)/revive/$', revivesource),
-    url(r'^source/(?P<sid>.*)/subscribe/$', subscribe, name='subscribe'),
-    url(r'^source/(?P<sid>.*)/$', source, name='source'),
-
-    
-
-
-    url(r'^post/(?P<pid>.*)/$', post_redirect),
-    url(r'^enclosure/(?P<eid>.*)/$', enclosure_redirect),
-
-
-    url(r'^addfeed/$', addfeed),
-    
-
-    url(r'^feedgarden/$', feedgarden),
+    path('source/<int:sid>/revive/', revivesource),
+    path('source/<int:sid>/subscribe/', subscribe, name='subscribe'),
+    path('source/<int:sid>/', source, name='source'),
 
     
 
-    url('^robots.txt$', robots),
-    url('^favicon.ico$', favicon),
+
+    path('post/<int:pid>/', post_redirect),
+    path('enclosure/<int:eid>/', enclosure_redirect),
+
+
+    path('addfeed/', addfeed),
+    
+
+    path('feedgarden/', feedgarden),
+
+    
+
+    path('robots.txt', robots),
+    path('favicon.ico', favicon),
 
     
 ]
