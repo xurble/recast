@@ -84,10 +84,15 @@
                     <tr 
                         {% if e.index <  subscription.last_sent %}class="old"{% endif %}
                         {% if e.index == subscription.last_sent %}class="current"{% endif %}
-            
-            
                     ><td><a href="{{e.link}}">{{e.title}}</a></td><td>{{e.created|date}}</td></tr>
                 {% endfor %}
+                {% if and_more > 0 %}
+                    <tr>
+                        <td><i>{{ and_more }} more episodes </i></td>
+                        <td></td>
+                    </tr>
+                {% endif %}
+
             </table>
 
             <br><br>

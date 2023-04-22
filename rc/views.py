@@ -252,7 +252,16 @@ def editfeed(request, key):
         
         sub.save()
         
-    request.vals["episodes"] = list(sub.source.posts.filter(index__gt=(sub.last_sent-5)))
+    eps = list(sub.source.posts.filter(index__gt=(sub.last_sent-5))[:10])
+    
+    if len(eps) > 0:
+        last_on_list = eps[-1].index
+    else:
+        last_on_list = 0
+        
+    request.vals["episodes"] = eps
+
+    request.vals["and_more"] = s.max_index - last_on_list
     
     request.vals["host"] = request.META["HTTP_HOST"]
     
@@ -304,6 +313,8 @@ def source(request,sid):
     
     s = get_object_or_404(Source,id=int(sid))
     request.vals["source"] = s
+    request.vals["posts"] = list(s.posts.all()[:100])
+    request.vals["and_more"] = s.max_index - 100
     request.vals["page_title"] = "A Recast of " + s.name
     if s.description:
         request.vals["page_description"] = s.description

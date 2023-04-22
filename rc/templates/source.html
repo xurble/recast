@@ -67,13 +67,20 @@
             <h3>Recastable Episodes ({{source.max_index}})</h3>
         
             <table class="episode-list">
-                {% for p in source.posts.all %}
+                {% for p in posts %}
                     <tr>
                         <td>{{p.index}}.</td>
                         <td><a href="{{p.link}}">{{p.title}}</a></td>
                         <td>{{p.created|date}}</td>
                     </tr>
                 {% endfor %}
+                {% if and_more > 0 %}
+                    <tr>
+                        <td></td>
+                        <td><i>{{ and_more }} more episodes </i></td>
+                        <td></td>
+                    </tr>
+                {% endif %}
             </table>
             <br><br>
         </div>
