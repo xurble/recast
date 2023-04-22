@@ -41,7 +41,7 @@
             <p>
                 The unique feed for this Recast is:<br>
                 <a href="/feed/{{subscription.key}}/">https://{{ host }}/feed/{{ subscription.key }}/</a>  
-                &nbsp;<a class="btn btn-xs btn-primary js-copy" href='#' title="Copy to clipboard"><i class="fas fa-copy"></i>  Copy</a>
+                &nbsp;<a class="btn btn-xs btn-primary js-copy" href='#' title="Copy to clipboard"><i class="fas fa-copy"></i>  <span id='copyprompt'>Copy</span></a>
             </p>
             <p>
                 Copy and Paste it to your podcast player of choice.
@@ -50,15 +50,14 @@
             <h3>Schedule</h3>
             
             <p>
-            <form method="POST">
-                <label class="nobold" for="frequency">New episodes a released every</label>
-                    <select name="frequency" id="frequency">
+            <form method="POST" name="frequencychange">
+                <label class="nobold" for="frequency">New episodes are released every</label>
+                    <select name="frequency" id="frequency" onchange="document.frequencychange.submit()">
                         {% for d in days %}
                             <option value="{{d}}" {% if d == subscription.frequency %}selected{% endif %}>{{d}}</option>
                         {% endfor %}
                 </select>
                 <label class="nobold" for="frequency">days.</label>
-                <input type="submit" value="Update Frequency" class="btn btn-xs btn-primary">
             </form>
             
             </p>
@@ -107,10 +106,14 @@
     
     
         clipboard.writeText("https://{{ host }}/feed/{{ subscription.key }}/");
-    
+        $("#copyprompt").text("Copied!")
+        setTimeout(resetCopy, 5000);
     
     });
 
+    function resetCopy() {
+        $("#copyprompt").text("Copy")
+    }
 
     </script>
  
