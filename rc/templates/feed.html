@@ -65,8 +65,10 @@
             <p>The next episode will drop <span id="countdown-holder">{{subscription.next_send_date}} (GMT)</span>.</p>
 
             <p>
-                <form method="POST">
-                    <input type="submit" name="release" value="Release Next Episode Now" class="btn btn-primary btn-xs">
+                <form method="POST" name="release_form">
+                    <input type="submit" value="Release Next Episode Now" class="btn btn-primary btn-xs">
+                    <input type="hidden" name="release" value="yes">
+                    <input type="hidden" name="episode" id="id_episode" value="{{ subscription.last_sent }}">
                 </form>
             </p>
             
@@ -82,11 +84,25 @@
                 {% for e in episodes %}
                     <tr 
                         {% if e.index <  subscription.last_sent %}class="old"{% endif %}
-                        {% if e.index == subscription.last_sent %}class="current"{% endif %}
-                    ><td><a href="{{e.link}}">{{e.title}}</a></td><td>{{e.created|date}}</td></tr>
+                        {% if e.index == subscription.last_sent %}class="current"{% endif %}>
+                        
+                        <td>
+                            <div style="width:20px">
+                                {% if e.index < subscription.last_sent %}
+                                    <a class="btn btn-xs btn-primary" href="javascript:setIndex({{e.index}})" title="Rewind to this episode"><span class="fa fa-fast-backward"></span></a>
+                                {% endif %}
+                                {% if e.index > subscription.last_sent %}
+                                    <a class="btn btn-xs btn-primary" href="javascript:setIndex({{e.index}})" title="Skip to this episode"><span class="fa fa-fast-forward  "></span></a>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td><a href="{{e.link}}">{{e.title}}</a></td>
+                        <td style="width:140px">{{e.created|date}}</td>
+                    </tr>
                 {% endfor %}
                 {% if and_more > 0 %}
                     <tr>
+                        <td></td>
                         <td><i>{{ and_more }} more episodes </i></td>
                         <td></td>
                     </tr>
@@ -113,6 +129,12 @@
 
     function resetCopy() {
         $("#copyprompt").text("Copy")
+    }
+    
+    function setIndex(idx) {
+        $("#id_episode").val(idx)
+        document.release_form.submit()
+    
     }
 
     </script>

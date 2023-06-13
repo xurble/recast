@@ -223,8 +223,14 @@ def editfeed(request, key):
     if request.method == "POST":
         
         if "release" in request.POST:
-            if sub.last_sent < sub.source.max_index:
-                sub.last_sent = sub.last_sent + 1
+        
+            idx = int(request.POST["episode"])
+            if idx == sub.last_sent:  # This is the release next button
+                idx += 1 
+            
+            
+            if idx <= sub.source.max_index:
+                sub.last_sent = idx
                 sub.last_sent_date = datetime.datetime.utcnow()
 
                 if settings.CLOUDFLARE_TOKEN:
@@ -252,7 +258,7 @@ def editfeed(request, key):
         
         sub.save()
         
-    eps = list(sub.source.posts.filter(index__gt=(sub.last_sent-5))[:10])
+    eps = list(sub.source.posts.filter(index__gt=(sub.last_sent-5))[:50])
     
     if len(eps) > 0:
         last_on_list = eps[-1].index
