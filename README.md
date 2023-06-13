@@ -12,7 +12,7 @@ By default Recast will feed you a new episode of the podcast every five days - e
 
 ## Installation
 
-Recast is a pretty simple django (3.2) application.
+Recast is a pretty simple django (4.2) application.
 
 Install it using `pip -r requirements.txt`
 
