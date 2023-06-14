@@ -24,8 +24,8 @@ Visit the link in an episode to edit the recast settings.
             {% endif %}
             <pubDate>{{p|subscription_created}}</pubDate>
             <description>
-                &lt;i&gt;{{p.created|date}}&lt;i&gt;&lt;br&gt;
-                [&lt;a href="{{url}}edit/"&gt;edit recast settings&lt;/a&gt;] &lt;br&gt;&lt;br&gt;
+                &lt;i&gt;Originally released {{p.created|date}}&lt;/i&gt;&lt;br&gt;
+                [&lt;a href="{{edit_link}}"&gt;edit recast settings&lt;/a&gt;] &lt;br&gt;&lt;br&gt;
                 {{ p.body }}
             </description> 
             <guid>{{subscription.key}}/{{p.id}}</guid> 
