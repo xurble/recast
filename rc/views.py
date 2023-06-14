@@ -146,7 +146,7 @@ def feed(request,key):
                         "enclosures" : {"all": [ {"recast_link":  "/static/audio/end.mp3",
                                                     "length": 94875,
                                                     "type": "audio/mpeg"  } ] },
-                        "image_url": "http://" + request.META["HTTP_HOST"] + "/static/images/recast-large.png" ,
+                        "image_url": "https://" + request.META["HTTP_HOST"] + "/static/images/recast-large.png" ,
                         "sub" : sub                       
                     }
                 ]
@@ -185,6 +185,7 @@ def feed(request,key):
     vals["posts"] += final_post
     
     vals["url"] = "https://" + request.META["HTTP_HOST"] + request.path
+    vals["edit_link"] = "https://" + request.META["HTTP_HOST"] + reverse("editfeed", args=[key])
     vals["base_href"] = "https://" + request.META["HTTP_HOST"]
     
     r = render(request, "rss.xml", vals)
