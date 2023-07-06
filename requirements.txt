@@ -19,7 +19,7 @@ charset-normalizer==3.1.0
     # via requests
 cloudflare==2.11.6
     # via -r requirements.in
-django==4.2.2
+django==4.2.3
     # via
     #   -r requirements.in
     #   django-feed-reader
@@ -54,7 +54,5 @@ soupsieve==2.4.1
     # via beautifulsoup4
 sqlparse==0.4.4
     # via django
-typing-extensions==4.6.3
-    # via asgiref
 urllib3==2.0.3
     # via requests
