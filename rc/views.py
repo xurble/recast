@@ -176,7 +176,7 @@ def feed(request,key):
     vals = {}
     vals["subscription"] = sub
     vals["source"]  = sub.source
-    vals["posts"] = list(Post.objects.filter(Q(source = sub.source) & Q(index__lte=sub.last_sent)).order_by("index")) 
+    vals["posts"] = list(Post.objects.filter(Q(source = sub.source) & Q(index__lte=sub.last_sent) & Q(index__gte=sub.last_sent-25)).order_by("index")) 
     
     for p in vals["posts"]:            #so that PostSubscription works
         p.current_subscription = sub
