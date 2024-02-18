@@ -211,25 +211,24 @@ def editfeed(request, key):
                 sub.last_sent = idx
                 sub.last_sent_date = datetime.datetime.utcnow()
 
-                if settings.CLOUDFLARE_TOKEN:
-
-                    domain = request.META["HTTP_HOST"]
-
-                    url = 'https://{}{}'.format(domain, reverse("feed", args=[key]))
-
-                    cf = CloudFlare.CloudFlare(token=settings.CLOUDFLARE_TOKEN)
-
-                    _ = cf.zones.purge_cache.post(
-                                settings.CLOUDFLARE_ZONE,
-                                data={
-                                    'files': [
-                                        url,
-                                    ]
-                                })
-
         else:
             sub.frequency = int(request.POST["frequency"])
 
+        if settings.CLOUDFLARE_TOKEN:
+
+            domain = request.META["HTTP_HOST"]
+
+            url = 'https://{}{}'.format(domain, reverse("feed", args=[key]))
+
+            cf = CloudFlare.CloudFlare(token=settings.CLOUDFLARE_TOKEN)
+
+            _ = cf.zones.purge_cache.post(
+                        settings.CLOUDFLARE_ZONE,
+                        data={
+                            'files': [
+                                url,
+                            ]
+                        })
         sub.save()
 
     eps = list(sub.source.posts.filter(index__gt=(sub.last_sent-5))[:50])
