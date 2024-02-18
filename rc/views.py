@@ -218,7 +218,7 @@ def editfeed(request, key):
 
             domain = request.META["HTTP_HOST"]
 
-            url = 'https://{}{}'.format(domain, reverse("feed", args=[key]))
+            url = 'https://{}{}'.format(domain, reverse("editfeed", args=[key]))
 
             cf = CloudFlare.CloudFlare(token=settings.CLOUDFLARE_TOKEN)
 
