@@ -2,9 +2,9 @@
 
 import os
 
-SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
-
 from recast import server_settings
+
+SITE_ROOT = os.path.dirname(os.path.realpath(__file__))
 
 CLOUDFLARE_TOKEN = server_settings.CLOUDFLARE_TOKEN
 CLOUDFLARE_ZONE = server_settings.CLOUDFLARE_ZONE
@@ -16,7 +16,7 @@ ADMINS = (
     # ('Your Name', 'your_email@example.com'),
 )
 
-FEEDS_USER_AGENT = "Recast/1.3"
+FEEDS_USER_AGENT = "Recast/1.5"
 FEEDS_SERVER = server_settings.FEEDS_SERVER
 FEEDS_CLOUDFLARE_WORKER = server_settings.FEEDS_CLOUDFLARE_WORKER
 
@@ -31,8 +31,6 @@ ALLOWED_HOSTS = server_settings.ALLOWED_HOSTS
 INTERNAL_IPS = (
     "127.0.0.1",
 )
-
-
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -96,7 +94,6 @@ STATICFILES_DIRS = (
 STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
-#    'django.contrib.staticfiles.finders.DefaultStorageFinder',
 )
 
 SECRET_KEY = server_settings.SECRET_KEY
@@ -105,7 +102,6 @@ SECRET_KEY = server_settings.SECRET_KEY
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
     'django.template.loaders.app_directories.Loader',
-#     'django.template.loaders.eggs.Loader',
 )
 
 MIDDLEWARE = [
