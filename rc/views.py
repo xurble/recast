@@ -271,12 +271,12 @@ def feedgarden(request):
 @login_required
 def testsource(request, sid):
     s = get_object_or_404(Source, id=int(sid))
-    if s.is_cloudflare:
+    if not s.is_cloudflare:
         ret = requests.get(s.feed_url, timeout=10)
     else:
         ret = requests.get(f"{settings.FEEDS_CLOUDFLARE_WORKER}/read/?target={s.feed_url}", timeout=10)
 
-    return HttpResponse('Feed:\n' + ret.text, content_type="text/plain")
+    return HttpResponse(f'Feed: {ret.url}\n' + ret.text, content_type="text/plain")
 
 
 @login_required
