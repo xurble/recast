@@ -13,7 +13,7 @@
             <h2>Feed Garden</h2>
             <p>Recast will take care of your feeds for you.  There should be no need to use this page.  Disused feeds will be automatically polled less frequently and erroring feeds will be automatically unsubscribed.</p>
             <p>However, feel free to feed your inner pendant and cultivate the feed list by hand.</p>
-            
+
             <table id="gardentable">
             	<tr>
                     <th>Subs</th>
@@ -30,13 +30,13 @@
             		<tr style="{{f.garden_style}}">
             		    <td style="text-align:center">{{f.num_subs}}</td>
             			<td>
-            			    <a href="/source/{{f.id}}/"><img src="/static/images/recast-small.png" alt="Feed" width="32"></a> 
-            			    <a href="{{f.best_link|escape}}">{{f.display_name}}</a> 
+            			    <a href="/source/{{f.id}}/"><img src="/static/images/recast-small.png" alt="Feed" width="32"></a>
+            			    <a href="{{f.best_link|escape}}">{{f.display_name}}</a>
             			    (<a href="{{f.feed_url|escape}}">feed</a>)
-            			    
+            			    (<a href="/source/{{f.id}}/test/">test</a>)
             			    {% if f.is_cloudflare %}
             			        😡
-            			    {% endif %}            			    
+            			    {% endif %}
             			</td>
             			<td style="text-align:right">{{f.max_index}}</td>
             			<td style="text-align:right">{{f.interval|hoursmins}}</td>
@@ -47,30 +47,30 @@
             			<td id="r{{f.id}}"><a href="javascript:refresh({{f.id}})" class="btn btn-sm btn-default">Refresh</a></td>
             		</tr>
             	{% endfor %}
-            
+
             </table>
 
             {% csrf_token %}
 
             <script>
-		
+
 
     function refresh(fid)
     {
     	$("#r" + fid).html('<div id="loader' + fid +'"><img src="/static/images/loader.gif" alt="Working" height="32" width="32"></div>');
-    
+
     	$.post("/source/" + fid + "/revive/",function(data){
-    	
+
     		$("#loader" + fid).fadeOut(function(){
     			$("#loader" + fid).html(data);
     			$("#loader" + fid).fadeIn();
     		});
-    	
+
     	},'html');
     }
 
-		
-		
+
+
 		    </script>
         </div>
     </div>
