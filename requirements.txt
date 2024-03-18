@@ -19,7 +19,7 @@ charset-normalizer==3.3.2
     # via requests
 cloudflare==2.11.8
     # via -r requirements.in
-django==4.2.10
+django==4.2.11
     # via
     #   -r requirements.in
     #   django-feed-reader
