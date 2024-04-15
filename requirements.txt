@@ -52,7 +52,7 @@ sgmllib3k==1.0.0
     #   feedparser
 soupsieve==2.5
     # via beautifulsoup4
-sqlparse==0.4.4
+sqlparse==0.5.0
     # via django
 typing-extensions==4.9.0
     # via asgiref
