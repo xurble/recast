@@ -321,9 +321,7 @@ def source(request, sid):
 
 @csrf_exempt
 def addfeed(request):
-    import pdb
 
-    pdb.set_trace()
     if request.method == "GET":
         raise PermissionDenied()
     elif request.method == "POST":
