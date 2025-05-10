@@ -5,54 +5,101 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('feeds', '0003_post_image_url'),
+        ("feeds", "0003_post_image_url"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Subscription',
+            name="Subscription",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('key', models.CharField(max_length=64, unique=True)),
-                ('last_sent', models.IntegerField(default=1)),
-                ('last_sent_date', models.DateTimeField()),
-                ('frequency', models.IntegerField(default=5)),
-                ('name', models.CharField(max_length=255)),
-                ('complete', models.BooleanField(default=False)),
-                ('created', models.DateTimeField(auto_now_add=True, null=True)),
-                ('last_accessed', models.DateTimeField(auto_now_add=True, null=True)),
-                ('source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='feeds.Source')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("key", models.CharField(max_length=64, unique=True)),
+                ("last_sent", models.IntegerField(default=1)),
+                ("last_sent_date", models.DateTimeField()),
+                ("frequency", models.IntegerField(default=5)),
+                ("name", models.CharField(max_length=255)),
+                ("complete", models.BooleanField(default=False)),
+                ("created", models.DateTimeField(auto_now_add=True, null=True)),
+                ("last_accessed", models.DateTimeField(auto_now_add=True, null=True)),
+                (
+                    "source",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="feeds.Source"
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-id'],
+                "ordering": ["-id"],
             },
         ),
         migrations.CreateModel(
-            name='SubscriptionPost',
+            name="SubscriptionPost",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created', models.DateTimeField(auto_now_add=True)),
-                ('post', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='feeds.Post')),
-                ('subscription', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='rc.Subscription')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created", models.DateTimeField(auto_now_add=True)),
+                (
+                    "post",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="feeds.Post"
+                    ),
+                ),
+                (
+                    "subscription",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="rc.Subscription",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='AccessLog',
+            name="AccessLog",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('raw_id', models.CharField(max_length=128)),
-                ('access_time', models.DateTimeField(auto_now_add=True)),
-                ('ip_address', models.CharField(max_length=16)),
-                ('user_agent', models.CharField(max_length=512)),
-                ('return_code', models.IntegerField()),
-                ('subscription', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='rc.Subscription')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("raw_id", models.CharField(max_length=128)),
+                ("access_time", models.DateTimeField(auto_now_add=True)),
+                ("ip_address", models.CharField(max_length=16)),
+                ("user_agent", models.CharField(max_length=512)),
+                ("return_code", models.IntegerField()),
+                (
+                    "subscription",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="rc.Subscription",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-id'],
+                "ordering": ["-id"],
             },
         ),
     ]

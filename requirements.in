@@ -1,10 +1,10 @@
-Django~=4.2
-requests~=2.31.0
+Django
+requests
 mysqlclient
-beautifulsoup4~=4.12.2
+beautifulsoup4~=4.12
 django-feed-reader
-django-smartcc~=0.1.2
-cloudflare~=2.11.1
+django-smartcc~=0.1
+cloudflare~=2.11
 
 
 # gunicorn

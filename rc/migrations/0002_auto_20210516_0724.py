@@ -4,23 +4,22 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('rc', '0001_initial'),
+        ("rc", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='subscription',
-            name='last_return_code',
+            model_name="subscription",
+            name="last_return_code",
             field=models.IntegerField(default=0),
         ),
         migrations.AddField(
-            model_name='subscription',
-            name='user_agent',
+            model_name="subscription",
+            name="user_agent",
             field=models.CharField(blank=True, max_length=512, null=True),
         ),
         migrations.DeleteModel(
-            name='AccessLog',
+            name="AccessLog",
         ),
     ]
