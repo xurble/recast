@@ -4,24 +4,27 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('rc', '0002_auto_20210516_0724'),
+        ("rc", "0002_auto_20210516_0724"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='subscription',
-            options={'ordering': ['-last_accessed']},
+            name="subscription",
+            options={"ordering": ["-last_accessed"]},
         ),
         migrations.AlterField(
-            model_name='subscription',
-            name='id',
-            field=models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID'),
+            model_name="subscription",
+            name="id",
+            field=models.BigAutoField(
+                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+            ),
         ),
         migrations.AlterField(
-            model_name='subscriptionpost',
-            name='id',
-            field=models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID'),
+            model_name="subscriptionpost",
+            name="id",
+            field=models.BigAutoField(
+                auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+            ),
         ),
     ]
