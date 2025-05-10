@@ -16,7 +16,7 @@ ADMINS = (
     # ('Your Name', 'your_email@example.com'),
 )
 
-FEEDS_USER_AGENT = "Recast/1.6"
+FEEDS_USER_AGENT = "Recast/1.7"
 FEEDS_SERVER = server_settings.FEEDS_SERVER
 FEEDS_CLOUDFLARE_WORKER = server_settings.FEEDS_CLOUDFLARE_WORKER
 
