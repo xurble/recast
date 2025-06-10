@@ -40,7 +40,7 @@ pyrfc3339==2.0.1
     # via django-feed-reader
 pyyaml==6.0.2
     # via cloudflare
-requests==2.32.3
+requests==2.32.4
     # via
     #   -r requirements.in
     #   cloudflare
