@@ -50,7 +50,7 @@ sgmllib3k==1.0.0
     # via
     #   django-feed-reader
     #   feedparser
-soupsieve==2.7
+soupsieve==2.8.4
     # via beautifulsoup4
 sqlparse==0.5.4
     # via django
