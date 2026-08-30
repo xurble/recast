@@ -148,9 +148,9 @@ Changing position resets the release baseline to the current time.
 
 Evidence: `rc.views.editfeed`; `rc/templates/feed.html`.
 
-**FR-014 — Purge configured cache state.** After a settings update, an installation
-with a Cloudflare token shall request a cache purge for the subscription settings
-URL before saving the subscription.
+**FR-014 — Purge configured cache state.** After saving a settings update, an
+installation with a Cloudflare token shall request a cache purge for the
+personalized RSS feed URL whose content changed.
 
 Evidence: `rc.views.editfeed`.
 
