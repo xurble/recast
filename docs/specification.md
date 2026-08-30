@@ -318,13 +318,21 @@ Evidence: `django-feed-reader/feeds/models.py` and
 - Subscription keys function as bearer secrets and appear in URLs.
 - Feed Garden, source testing, and source revival require Django authentication.
 - Django admin uses Django's normal administration authentication and permissions.
+- In production (`DEBUG=False`), Django redirects HTTP requests to HTTPS, marks
+  session and CSRF cookies Secure, and sends a one-year HSTS policy on HTTPS
+  responses. The policy does not include subdomains or request browser preload.
+- A deployment that terminates TLS at a trusted reverse proxy must explicitly
+  configure `SECURE_PROXY_SSL_HEADER`; direct TLS deployments leave it unset.
+- Development (`DEBUG=True`) permits HTTP and disables Secure-cookie, redirect,
+  and HSTS enforcement.
 - `/refresh/` is public in the current implementation.
 - `addfeed` and `editfeed` are CSRF-exempt in the current implementation; the
   source subscribe and revive forms use Django CSRF protection.
 - Feed discovery, testing, and refresh cause server-side outbound HTTP requests to
   source-controlled URLs.
 
-Evidence: decorators and request handling in `rc/views.py`; `recast/urls.py`.
+Evidence: decorators and request handling in `rc/views.py`; `recast/urls.py`;
+security settings in `recast/settings.py`; deployment guidance in `README.md`.
 
 ## Integrations and compatibility constraints
 
