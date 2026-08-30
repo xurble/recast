@@ -178,7 +178,6 @@ def feed(request, key):
 
     vals["posts"] += final_post
 
-    vals["url"] = "https://" + request.META["HTTP_HOST"] + request.path
     vals["edit_link"] = (
         "https://" + request.META["HTTP_HOST"] + reverse("editfeed", args=[key])
     )

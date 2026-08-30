@@ -34,7 +34,7 @@ urlpatterns = [
     path(r"", index),
     path(r"refresh/", reader),
     path(r"help/", help),
-    path("feed/(<str:key>)/edit/", editfeed),  # legacy
+    path("feed/<str:key>/edit/", editfeed, name="legacy_editfeed"),
     path("feed/edit/<str:key>/", editfeed, name="editfeed"),
     path("feed/<str:key>/", feed, name="feed"),
     path("source/<int:sid>/revive/", revivesource),
