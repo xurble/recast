@@ -225,10 +225,11 @@ def editfeed(request, key):
         else:
             sub.frequency = int(request.POST["frequency"])
 
-        if settings.CLOUDFLARE_TOKEN:
-            domain = request.META["HTTP_HOST"]
+        sub.save()
 
-            url = "https://{}{}".format(domain, reverse("editfeed", args=[key]))
+        if settings.CLOUDFLARE_TOKEN:
+            domain = request.get_host()
+            url = "https://{}{}".format(domain, reverse("feed", args=[key]))
 
             cf = CloudFlare.CloudFlare(token=settings.CLOUDFLARE_TOKEN)
 
@@ -240,7 +241,6 @@ def editfeed(request, key):
                     ]
                 },
             )
-        sub.save()
 
     eps = list(sub.source.posts.filter(index__gt=(sub.last_sent - 5))[:50])
 
