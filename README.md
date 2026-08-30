@@ -16,7 +16,8 @@ Recast is a pretty simple django (4.2) application.
 
 Install it using `pip -r requirements.txt`
 
-There are a number of settings that are not in `settings.py`  They are imported from `server_setings.py` which you will need to create.
+There are a number of settings that are not in `settings.py`. They are imported
+from `recast/server_settings.py`, which you will need to create.
 
 The settings are as follows:
 
@@ -27,6 +28,33 @@ The settings are as follows:
 * `DEBUG`
 * `SECRET_KEY` 
 * `DATABASES` - The full database dictionary 
+
+### HTTPS deployment
+
+Django enforces the production HTTPS boundary when `DEBUG = False`:
+
+* HTTP requests are permanently redirected to HTTPS.
+* Session and CSRF cookies use the `Secure` attribute.
+* HTTPS responses send HSTS with a one-year lifetime. The policy deliberately
+  excludes subdomains and the browser preload list because this repository does
+  not control or verify every subdomain.
+
+Terminate TLS either in the application server or in a trusted reverse proxy. If
+TLS terminates in a proxy, add this to `recast/server_settings.py`:
+
+```python
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+```
+
+Only set that value when the proxy removes any client-supplied
+`X-Forwarded-Proto` header and replaces it with the connection's real scheme.
+Otherwise clients could spoof secure requests. A missing or incorrect proxy
+setting can also cause an HTTPS redirect loop.
+
+For local HTTP development, set `DEBUG = True`. This explicitly disables the
+redirect, Secure-cookie requirement, and HSTS; never use that setting in
+production. HSTS is intentionally enabled only after a successful HTTPS request,
+so deploy and verify TLS before directing production traffic to the application.
 
 
 ### Recast Specific Settings
@@ -50,4 +78,3 @@ Once Recast is running, in order to keep it ticking over and reading feeds you n
 I have a cron job that does this every 10 minutes.  
 
 And that's it.
-

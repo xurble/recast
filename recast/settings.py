@@ -12,6 +12,19 @@ CLOUDFLARE_ZONE = server_settings.CLOUDFLARE_ZONE
 DEBUG = server_settings.DEBUG
 TEMPLATE_DEBUG = DEBUG
 
+# Production requests must arrive over HTTPS. Development remains available over
+# HTTP by setting DEBUG=True in the environment-specific server_settings module.
+SECURE_SSL_REDIRECT = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_HSTS_SECONDS = 31_536_000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+
+# Only trust a proxy-provided scheme header when the deployment explicitly opts
+# in and guarantees that the proxy strips values supplied by clients.
+SECURE_PROXY_SSL_HEADER = getattr(server_settings, "SECURE_PROXY_SSL_HEADER", None)
+
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
 )
@@ -103,6 +116,7 @@ TEMPLATE_LOADERS = (
 )
 
 MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
