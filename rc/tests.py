@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.conf import settings
@@ -5,10 +6,99 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.middleware.security import SecurityMiddleware
+from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, override_settings
-from django.urls import reverse
+from django.urls import resolve, reverse
 
 from .views import editfeed
+
+
+class SubscriptionSettingsLinkTests(SimpleTestCase):
+    def setUp(self):
+        self.key = "subscription-key"
+        self.canonical_path = reverse("editfeed", args=[self.key])
+
+    def test_canonical_settings_url_resolves(self):
+        match = resolve(self.canonical_path)
+
+        self.assertIs(match.func, editfeed)
+        self.assertEqual(match.kwargs, {"key": self.key})
+
+    def test_legacy_settings_url_resolves(self):
+        match = resolve(f"/feed/{self.key}/edit/")
+
+        self.assertIs(match.func, editfeed)
+        self.assertEqual(match.kwargs, {"key": self.key})
+
+    def test_rss_emits_canonical_settings_url(self):
+        edit_link = f"https://testserver{self.canonical_path}"
+        post = {
+            "title": "Test episode",
+            "recast_link": "/post/1/",
+            "author": None,
+            "created": None,
+            "created_for_subscription": "Sun, 30 Aug 2026 00:00:00 GMT",
+            "body": "Episode description",
+            "id": 1,
+            "enclosures": SimpleNamespace(all=[]),
+            "image_url": None,
+        }
+
+        rendered = render_to_string(
+            "rss.xml",
+            {
+                "source": SimpleNamespace(
+                    name="Test podcast",
+                    image_url=None,
+                ),
+                "subscription": SimpleNamespace(
+                    frequency=5,
+                    key=self.key,
+                ),
+                "posts": [post],
+                "edit_link": edit_link,
+                "base_href": "https://testserver",
+            },
+        )
+
+        self.assertIn(f"<link>{edit_link}</link>", rendered)
+        self.assertEqual(rendered.count(edit_link), 2)
+        self.assertNotIn(f"/feed/{self.key}/edit/", rendered)
+
+    def test_administrator_page_emits_canonical_settings_url(self):
+        subscription = SimpleNamespace(
+            key=self.key,
+            last_sent=4,
+            complete=False,
+            frequency=5,
+            created=None,
+            last_sent_date=None,
+            last_accessed=None,
+            user_agent=None,
+            last_return_code=200,
+        )
+        source = SimpleNamespace(
+            id=1,
+            name="Test podcast",
+            description=None,
+            site_url="https://example.com",
+            image_url=None,
+            max_index=4,
+            subscription_set=SimpleNamespace(all=lambda: [subscription]),
+        )
+
+        rendered = render_to_string(
+            "source.html",
+            {
+                "source": source,
+                "posts": [],
+                "and_more": 0,
+                "user": SimpleNamespace(is_superuser=True),
+            },
+        )
+
+        self.assertIn(f'href="{self.canonical_path}"', rendered)
+        self.assertNotIn(f"/feed/{self.key}/edit/", rendered)
 
 
 class HttpsSecurityTests(SimpleTestCase):

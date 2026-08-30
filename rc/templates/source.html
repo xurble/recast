@@ -48,7 +48,7 @@
                 </tr>
                 {% for s in source.subscription_set.all %}
                     <tr>
-                        <td><a href="/feed/{{ s.key }}/edit/">{{s.last_sent}} {% if s.complete %}(done){% endif %}</a></td>
+                        <td><a href="{% url 'editfeed' s.key %}">{{s.last_sent}} {% if s.complete %}(done){% endif %}</a></td>
                         <td>{{s.frequency}}</td>
                         <td>{{s.created|date}}</td>
                         <td>{{s.last_sent_date|date}}</td>
