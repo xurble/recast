@@ -9,8 +9,9 @@ from django.middleware.security import SecurityMiddleware
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import resolve, reverse
+from django.utils import timezone
 
-from .views import editfeed
+from .views import editfeed, feed
 
 
 class SubscriptionSettingsLinkTests(SimpleTestCase):
@@ -191,6 +192,60 @@ class HttpsSecurityTests(SimpleTestCase):
 
         self.assertTrue(response.cookies[settings.SESSION_COOKIE_NAME]["secure"])
         self.assertTrue(response.cookies[settings.CSRF_COOKIE_NAME]["secure"])
+
+
+class FeedUserAgentTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.subscription = Mock(
+            id=1,
+            complete=True,
+            last_sent=1,
+            last_sent_date=timezone.now(),
+        )
+        self.subscription.source = Mock()
+
+    def request_feed(self, **request_headers):
+        request = self.factory.get(
+            reverse("feed", args=["subscription-key"]),
+            HTTP_HOST="testserver",
+            **request_headers,
+        )
+
+        with (
+            patch(
+                "rc.views.Subscription.objects.get",
+                return_value=self.subscription,
+            ),
+            patch("rc.views.Post.objects.filter") as posts,
+            patch("rc.views.render", return_value=HttpResponse()) as render,
+        ):
+            posts.return_value.order_by.return_value = []
+            response = feed(request, "subscription-key")
+
+        self.assertEqual(response.status_code, 200)
+        render.assert_called_once()
+
+    def test_missing_user_agent_is_recorded_as_empty(self):
+        self.request_feed()
+
+        self.assertEqual(self.subscription.user_agent, "")
+
+    def test_empty_user_agent_is_recorded_as_empty(self):
+        self.request_feed(HTTP_USER_AGENT="")
+
+        self.assertEqual(self.subscription.user_agent, "")
+
+    def test_user_agent_is_recorded(self):
+        self.request_feed(HTTP_USER_AGENT="PodcastClient/1.0")
+
+        self.assertEqual(self.subscription.user_agent, "PodcastClient/1.0")
+
+    def test_oversized_user_agent_is_truncated_to_model_limit(self):
+        self.request_feed(HTTP_USER_AGENT="a" * 600)
+
+        self.assertEqual(self.subscription.user_agent, "a" * 512)
+        self.assertEqual(len(self.subscription.user_agent), 512)
 
 
 @override_settings(CLOUDFLARE_TOKEN="token", CLOUDFLARE_ZONE="zone")

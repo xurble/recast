@@ -85,7 +85,7 @@ def feed(request, key):
 
     sub.last_return_code = 500
     sub.last_accessed = right_now
-    sub.user_agent = request.META["HTTP_USER_AGENT"][:512]
+    sub.user_agent = request.META.get("HTTP_USER_AGENT", "")[:512]
     sub.save()
 
     browser_etag = ""
