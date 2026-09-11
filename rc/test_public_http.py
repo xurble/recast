@@ -213,3 +213,14 @@ class DiscoverySSRFTests(TestCase):
                             resource.assert_not_called()
         self.assertEqual(Source.objects.count(), 0)
         self.unrestricted.assert_not_called()
+
+    def test_root_pagination_link_cannot_bypass_guard(self):
+        for destination in ["http://127.0.0.1/private", "http://169.254.169.254/latest/meta-data/"]:
+            with self.subTest(destination=destination):
+                body = ('<link rel="next" href="' + destination + '">').encode() + RSS + b"</link>"
+                self.dns.side_effect = [[answer("93.184.216.34")], [answer("127.0.0.1")]]
+                with patch("rc.views.public_get", return_value=response(body)):
+                    result = self.submit()
+                self.assertIn(b'"ok": false', result.content)
+                self.assertEqual(Source.objects.count(), 0)
+                self.unrestricted.assert_not_called()

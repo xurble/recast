@@ -31,13 +31,14 @@ def import_public_feed(source, response, headers):
                 if link.get("rel") == "next":
                     next_url = urljoin(response.url, link.get("href", ""))
                     break
-            for parent in root.iter():
-                for child in list(parent):
-                    if (child.tag.rsplit("}", 1)[-1].lower() == "link"
-                            and any(key.rsplit("}", 1)[-1].lower() == "rel"
-                                    and value.strip().lower() == "next"
-                                    for key, value in child.attrib.items())):
-                        parent.remove(child)
+            # Normalize every element, including the root. Feedparser accepts
+            # loose feed wrappers and folds XML names; none may retain a next
+            # relation when handed to the library's network-capable parser.
+            for element in root.iter():
+                for key, value in list(element.attrib.items()):
+                    if (key.rsplit("}", 1)[-1].lower() == "rel"
+                            and value.strip().lower() == "next"):
+                        del element.attrib[key]
             body = ElementTree.tostring(root, encoding="utf-8")
         ok, changed = parse_feed(source, body, content_type, StringIO())
         if not ok:
