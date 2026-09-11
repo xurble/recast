@@ -78,3 +78,48 @@ Once Recast is running, in order to keep it ticking over and reading feeds you n
 I have a cron job that does this every 10 minutes.  
 
 And that's it.
+
+### Public feed discovery network policy
+
+The public `/addfeed/` endpoint permits only HTTP(S) URLs resolving entirely to
+public addresses. Private, loopback, link-local, reserved, multicast, shared
+address space and IPv6 transition destinations are rejected, including mixed
+public/private DNS answers. IPv6 destinations must be global unicast in 2000::/3.
+There is no private-feed exception for this endpoint.
+
+Each discovery or initial-import pagination request resolves and checks every DNS
+answer, then connects to one validated numeric address. The original hostname is
+preserved for HTTP Host, HTTPS SNI and certificate validation. Environment proxies
+and netrc credentials are not used. Redirects are handled explicitly and checked
+before each connection (at most ten hops). Connection failures fail closed rather
+than retrying through unvalidated destinations. Users receive generic failures;
+internal addresses and exception details are not returned.
+
+Initial imports reuse the fetched response. XML pagination is fetched through the
+same guarded transport rather than the feed-reader's HTTP path. XML must be
+well-formed; imports with a failed/unsafe page, a pagination loop or more than 20
+pages roll back atomically. JSON and XML entries still use the pinned feed-reader's
+parser and persistence behavior. No database migration is needed.
+
+This policy covers public discovery and its synchronous initial import. Scheduled
+refreshes and the separate source-test endpoint still use their existing network
+paths; this change does not claim application-wide SSRF protection. Resource
+quotas, response-size bounds and hard wall-clock deadlines belong to the separate
+bounded-import work. Existing HTML/Cloudflare discovery defects are unchanged.
+
+### Isolated checks
+
+Use Python 3.12 and a local virtual environment, with mysqlclient build
+prerequisites available:
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+./scripts/check
+```
+
+`recast.test_settings` uses an ephemeral secret and temporary SQLite, static and
+media paths, a local-memory cache and in-memory email. It does not load deployment
+settings. Network regression tests mock DNS and HTTP boundaries; they never query
+feeds, Cloudflare or production services. Tests check TLS hostname/pinning options;
+they do not perform a live public TLS handshake.
