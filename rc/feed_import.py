@@ -33,7 +33,10 @@ def import_public_feed(source, response, headers):
                     break
             for parent in root.iter():
                 for child in list(parent):
-                    if child.tag.rsplit("}", 1)[-1] == "link" and child.get("rel") == "next":
+                    if (child.tag.rsplit("}", 1)[-1].lower() == "link"
+                            and any(key.rsplit("}", 1)[-1].lower() == "rel"
+                                    and value.strip().lower() == "next"
+                                    for key, value in child.attrib.items())):
                         parent.remove(child)
             body = ElementTree.tostring(root, encoding="utf-8")
         ok, changed = parse_feed(source, body, content_type, StringIO())

@@ -186,3 +186,16 @@ class DiscoverySSRFTests(TestCase):
             self.assertIn("Episode body", post.body)
             self.assertEqual(post.enclosures.count(), 1)
         self.unrestricted.assert_not_called()
+
+    def test_case_variant_pagination_cannot_bypass_guard(self):
+        for link in [b'<atom:LINK rel="next" href="http://127.0.0.1/"/>',
+                     b'<atom:link REL="next" href="http://169.254.169.254/"/>',
+                     b'<atom:LiNk ReL="next" href="http://10.0.0.1/"/>']:
+            with self.subTest(link=link):
+                paged = RSS.replace(b"</channel>", link + b"</channel>")
+                self.dns.side_effect = [[answer("93.184.216.34")], [answer("127.0.0.1")]]
+                with patch("rc.views.public_get", return_value=response(paged)):
+                    result = self.submit()
+                self.assertIn(b'"ok": false', result.content)
+                self.assertEqual(Source.objects.count(), 0)
+                self.unrestricted.assert_not_called()
