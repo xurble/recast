@@ -54,3 +54,13 @@ class SubscriptionPost(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
     subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE)
     created = models.DateTimeField(auto_now_add=True)
+
+
+class DiscoveryQuota(models.Model):
+    """One durable row bounds anonymous discovery across all web workers."""
+
+    window_started = models.DateTimeField(null=True)
+    attempts = models.PositiveIntegerField(default=0)
+    sources_created = models.PositiveIntegerField(default=0)
+    lease_token = models.CharField(max_length=32, blank=True, default="")
+    lease_until = models.DateTimeField(null=True)

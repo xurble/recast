@@ -18,7 +18,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.utils.cache import patch_response_headers
 from feeds.models import Source, Post, Enclosure
-from feeds.utils import update_feeds, read_feed
+from feeds.utils import update_feeds
 
 import CloudFlare
 
@@ -27,13 +27,10 @@ import uuid
 import email
 import json
 
-import feedparser
 
 from .models import Subscription
 
 
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
 import requests
 
 
@@ -320,170 +317,41 @@ def source(request, sid):
 
 @csrf_exempt
 def addfeed(request):
+    from django.db import DatabaseError
+    from django.utils.html import format_html, format_html_join
+    from .discovery import discover
+    from .discovery_worker import DiscoveryError
 
-    if request.method == "GET":
+    if request.method != "POST":
         raise PermissionDenied()
-    elif request.method == "POST":
-        try:
-            source = None
-            proxies = None
-
-            feed = request.POST["feed"]
-
-            if request.META["HTTP_HOST"] in feed:
-                return HttpResponse(
-                    "<h2>Subscription Error</h2>You cannot recast a Recast feed!"
-                )
-
-            try:
-                source = Source.objects.filter(feed_url__iexact=feed)[0]
-            except Exception:
-                try:
-                    source = Source.objects.filter(site_url__iexact=feed)[0]
-                except Exception:
-                    pass
-
-            isFeed = False
-            if source is None:
-                headers = {
-                    "User-Agent": "{} (+{}; Initial Feed Crawler)".format(
-                        settings.FEEDS_USER_AGENT, settings.FEEDS_SERVER
-                    ),
-                    "Cache-Control": "no-cache,max-age=0",
-                    "Pragma": "no-cache",
-                }  # identify ourselves and also stop our requests getting picked up by google's cache
-
-                ret = requests.get(feed, headers=headers, proxies=proxies, timeout=30)
-                # can I be bothered to check return codes here?  I think not on balance
-
-                if ret.status_code == 200:
-                    content_type = "Not Set"
-                    if "Content-Type" in ret.headers:
-                        content_type = ret.headers["Content-Type"]
-
-                    feed_title = feed
-
-                    body = ret.text.strip()
-                    if "xml" in content_type or body[0:1] == "<":
-                        ff = feedparser.parse(body)  # are we a feed?
-                        isFeed = len(ff.entries) > 0
-                        if isFeed:
-                            feed_title = ff.feed.title
-                            try:
-                                feed_link = ff.feed.link
-                            except:
-                                feed_link = feed
-                    if "json" in content_type or body[0:1] == "{":
-                        data = json.loads(body)
-                        isFeed = "items" in data and len(data["items"]) > 0
-                        if isFeed:
-                            feed_title = data["title"]
-                            feed_link = data["home_page_url"]
-
-                    if not isFeed:
-                        soup = BeautifulSoup(body)
-                        feedcount = 0
-                        rethtml = ""
-                        for lnk in soup.findAll(name="link"):
-                            if lnk.has_attr("rel") and lnk.has_attr("type"):
-                                print(lnk)
-                                if lnk["rel"][0] == "alternate" and (
-                                    lnk["type"] == "application/atom+xml"
-                                    or lnk["type"] == "application/rss+xml"
-                                ):
-                                    feedcount += 1
-                                    try:
-                                        name = lnk["title"]
-                                    except Exception:
-                                        name = "Feed %d" % feedcount
-                                    rethtml += (
-                                        '<li><form method="post" action="/addfeed/"> <input type="hidden" name="cloudflare" value="%s"><input type="hidden" name="feed" value="%s"><input type="submit" class="btn btn-success btn-xs" value="Recast"> - %s</form></li>'
-                                        % (cloudflare, urljoin(feed, lnk["href"]), name)
-                                    )
-                                    feed = urljoin(
-                                        feed, lnk["href"]
-                                    )  # store this in case there is only one feed and we wind up importing it
-                                    # TODO: need to accout for relative URLs here
-                        if feedcount == 0:
-                            return HttpResponse("<h2>No feeds found</h2>")
-                        else:
-                            return HttpResponse(
-                                "<h2>Available Feeds</h2><ul id='addfeedlist' class='feedlist'>"
-                                + rethtml
-                                + "</ul>"
-                            )
-                elif ret.status_code == 403:
-                    if cloudflare == "no":
-                        if "Cloudflare" in ret.text or (
-                            "Server" in ret.headers
-                            and "cloudflare" in ret.headers["Server"]
-                        ):
-                            return JsonResponse(
-                                {
-                                    "ok": False,
-                                    "reason": "cloudflare",
-                                    "msg": "Attempt to get podcast blocked by Cloudflare. 😡  If you want to try again, we know some tricks that might work.",
-                                }
-                            )
-
-                    if proxy:
-                        proxy.delete()
-
-                    return JsonResponse(
-                        {
-                            "ok": False,
-                            "reason": "403",
-                            "msg": "Recast was blocked from accessing the podcast.",
-                        }
-                    )
-                else:
-                    return JsonResponse(
-                        {
-                            "ok": False,
-                            "reason": str(ret.status_code),
-                            "msg": "Recast could note access the podcast, please check the link and try again.",
-                        }
-                    )
-
-            if isFeed and source is None:
-                # need to start checking feed parser errors here
-                source = Source()
-                source.due_poll = datetime.datetime.utcnow()
-
-                source.name = feed
-                try:
-                    source.name = feed_title
-                    source.site_url = feed_link
-                except Exception:
-                    pass
-                source.feed_url = feed
-                source.num_subs = 0
-                source.save()
-
-                # import the entries now
-                (ok, changed) = read_feed(source)
-
-                # TODO: Check the OK return val?  Surely that's a good idea
-
-                source.last_change = datetime.datetime.utcnow()
-
-                source.save()
-
-            if request.POST.get("ajax", "nope") == "yep":
-                return JsonResponse(
-                    {"ok": True, "feed": reverse("source", args=[source.id])}
-                )
-            else:
-                return HttpResponseRedirect(reverse("source", args=[source.id]))
-
-        except Exception as xx:
-            return JsonResponse(
-                {
-                    "ok": False,
-                    "reason": str(xx),
-                    "msg": "Recast could not connect to the podcast server.  You can try again, it might work 🤷‍.",
-                }
+    try:
+        feed = request.POST.get("feed", "").strip()
+        if request.get_host() in feed:
+            return HttpResponse("<h2>Subscription Error</h2>You cannot recast a Recast feed!")
+        source, links = discover(feed)
+        if links is not None:
+            if not links:
+                return HttpResponse("<h2>No feeds found</h2>")
+            choices = format_html_join(
+                "", '<li><form method="post" action="/addfeed/">'
+                '<input type="hidden" name="feed" value="{}">'
+                '<input type="submit" class="btn btn-success btn-xs" value="Recast"> - {}</form></li>',
+                ((link["url"], link["title"]) for link in links),
             )
+            return HttpResponse(format_html(
+                "<h2>Available Feeds</h2><ul id='addfeedlist' class='feedlist'>{}</ul>", choices
+            ))
+        target = reverse("source", args=[source.id])
+        if request.POST.get("ajax") == "yep":
+            return JsonResponse({"ok": True, "feed": target})
+        return HttpResponseRedirect(target)
+    except DiscoveryError as error:
+        response = JsonResponse({"ok": False, "reason": error.reason, "msg": str(error)}, status=error.status)
+        if error.status == 429:
+            response["Retry-After"] = "60"
+        return response
+    except DatabaseError:
+        return JsonResponse({"ok": False, "reason": "unavailable", "msg": "Feed imports are temporarily unavailable."}, status=503)
 
 
 def subscribe(request, sid):

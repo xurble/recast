@@ -78,3 +78,76 @@ Once Recast is running, in order to keep it ticking over and reading feeds you n
 I have a cron job that does this every 10 minutes.  
 
 And that's it.
+
+### Bounded public feed discovery
+
+Initial imports remain synchronous. Recast fetches and parses an unknown source
+once in a disposable subprocess, then imports the validated entries atomically.
+The subprocess has no Django settings or deployment environment. It verifies TLS,
+does not use environment proxy credentials, and cannot access the database.
+Initial imports never follow feed pagination or invoke `read_feed`; scheduled
+`refreshfeeds` behavior is unchanged and is outside these initial-import limits.
+
+The default `RECAST_DISCOVERY_LIMITS` can be overridden by a dictionary in
+`recast/server_settings.py` (omitted keys retain their defaults):
+
+| Key | Default | Meaning |
+| --- | ---: | --- |
+| `wire_bytes` | 2097152 | 2 MiB of compressed/received body bytes |
+| `body_bytes` | 8388608 | 8 MiB after decompression |
+| `entries` | 500 | Reject larger feeds; do not silently truncate history |
+| `attachments_per_entry` | 10 | Maximum enclosure/media declarations per entry |
+| `attachments` | 2000 | Maximum enclosure/media declarations across the feed |
+| `redirects` | 3 | HTTP redirect hops; redirect bodies are not downloaded |
+| `seconds` | 15 | Wall-clock subprocess deadline, including startup, DNS, headers, body, parsing and result serialization |
+| `attempts_per_hour` | 30 | Global unknown-source discovery attempts per window |
+| `sources` | 10000 | Lifetime successful public source creations after this migration |
+
+Values must be positive integers. Identity and single-member gzip responses are
+accepted; other encodings, concatenated/truncated gzip and XML entity declarations
+are rejected. HTML discovery offers at most 20 alternate links. Parsed worker
+output is additionally capped at 16 MiB. These conservative defaults bound work
+while accommodating typical podcast feeds; operators can raise them deliberately
+for larger archives. They do not impose a total cap on existing sources or future
+scheduled refreshes.
+
+Run `manage.py migrate` before enabling the new code. Migration `0004` creates
+and seeds one `DiscoveryQuota` row; it does not modify existing feeds. Quotas use
+database write locking, not process-local cache or client IPs. Only one discovery
+may run at once across workers. A window begins with its first attempt and resets
+one hour later. Errors and HTML-only discoveries consume an attempt. Returning an
+existing source needs no worker or quota slot. Successful imports increment the
+lifetime counter, which does not decrease when sources are deleted. Reaching that
+cap requires an operator to raise `sources`; it never silently resets.
+
+A lease expires after the worker deadline plus 30 seconds, recovering a crashed
+request without allowing a stale worker to commit or release a newer lease. The
+bounded database import uses a transaction and checks the lease before and after
+its writes; a limit violation or persistence failure leaves no partial source,
+posts or enclosures. The 15-second hard deadline applies to fetching/parsing;
+database availability and individual SQL execution remain subject to deployment
+DB timeouts. Operators should configure finite connection/lock/statement timeouts.
+The lease does not cancel an SQL statement already in progress.
+
+Busy/rate/capacity responses use HTTP 429; feed limits and malformed feeds use 422;
+upstream HTTP failures use 502; unavailable quota/database access uses 503. The
+submission page displays the returned explanation and stops its progress indicator.
+No background queue or additional infrastructure is introduced. Roll back the
+application before reversing `0004`; otherwise discovery fails closed when the
+quota table/seed is absent.
+
+### Isolated local validation
+
+Use Python 3.12 and a worktree-local environment:
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python manage.py test rc --settings=recast.test_settings
+./scripts/check
+```
+
+The test settings provide an ephemeral secret, SQLite database, local memory cache
+and temporary static/media paths. They never load `server_settings.py` or production
+credentials. Discovery network tests mock requests; subprocess deadline tests use
+an inert local sleeping process. No feed or Cloudflare service is required.

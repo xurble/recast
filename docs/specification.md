@@ -94,10 +94,13 @@ selection.
 Evidence: `rc.views.addfeed`; `rc/templates/index.html`.
 
 **FR-006 — Import a new source.** A newly recognized feed shall create a Source,
-schedule it for polling, and immediately ask `django-feed-reader` to import its
-entries. The resulting public source page shall be returned to the listener.
+schedule it for polling, and immediately import its validated entries atomically
+without refetching or following feed pagination. Public discovery enforces the
+configurable size, decompression, entry, attachment, deadline and shared quota
+policy documented in README.md. Limit violations must not persist a partial
+source. The resulting public source page shall be returned to the listener.
 
-Evidence: `rc.views.addfeed`; `feeds.utils.read_feed`.
+Evidence: `rc.views.addfeed`; `rc.discovery`; `rc.discovery_worker`.
 
 **FR-007 — Report discovery failures.** Recast shall distinguish Cloudflare-like
 HTTP 403 responses, other HTTP 403 responses, other non-success status codes, and
@@ -351,8 +354,9 @@ security settings in `recast/settings.py`; deployment guidance in `README.md`.
 
 ## Meaningful non-functional behavior
 
-- Initial URL discovery uses a 30-second outbound request timeout; source testing
-  uses 10 seconds.
+- Initial URL discovery has a 15-second fetch/parse subprocess deadline and
+  database-backed admission quotas; see README.md for defaults and SQL timeout
+  boundaries. Source testing uses 10 seconds.
 - Successful personalized feeds are cacheable for one hour; terminal responses are
   cacheable for one week.
 - RSS output uses RSS 2.0 with the iTunes podcast namespace.
