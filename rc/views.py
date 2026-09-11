@@ -27,6 +27,7 @@ import datetime
 import uuid
 import email
 import json
+from io import BytesIO
 
 import feedparser
 
@@ -368,7 +369,7 @@ def addfeed(request):
 
                     body = ret.text.strip()
                     if "xml" in content_type or body[0:1] == "<":
-                        ff = feedparser.parse(body)  # are we a feed?
+                        ff = feedparser.parse(BytesIO(ret.content))  # Parse data, never a URL/path.
                         isFeed = len(ff.entries) > 0
                         if isFeed:
                             feed_title = ff.feed.title

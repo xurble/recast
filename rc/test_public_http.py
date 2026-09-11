@@ -199,3 +199,17 @@ class DiscoverySSRFTests(TestCase):
                 self.assertIn(b'"ok": false', result.content)
                 self.assertEqual(Source.objects.count(), 0)
                 self.unrestricted.assert_not_called()
+
+    def test_url_shaped_xml_response_is_data_not_a_resource(self):
+        for body in [b"http://169.254.169.254/latest/meta-data/", b"http://127.0.0.1/",
+                     b"file:///etc/passwd", b"/etc/passwd"]:
+            with self.subTest(body=body):
+                with patch("rc.views.public_get", return_value=response(body)):
+                    with patch("feedparser.http.get", side_effect=AssertionError("Parser network")) as fetch:
+                        with patch("feedparser.api.open", side_effect=AssertionError("Parser file"), create=True) as resource:
+                            result = self.submit()
+                            self.assertNotIn(b'"ok": true', result.content)
+                            fetch.assert_not_called()
+                            resource.assert_not_called()
+        self.assertEqual(Source.objects.count(), 0)
+        self.unrestricted.assert_not_called()

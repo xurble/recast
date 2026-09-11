@@ -1,5 +1,5 @@
 """Import validated responses without feed-reader's unrestricted HTTP calls."""
-from io import StringIO
+from io import BytesIO, StringIO
 from urllib.parse import urljoin
 from xml.etree import ElementTree
 
@@ -26,7 +26,7 @@ def import_public_feed(source, response, headers):
                 root = ElementTree.fromstring(body)
             except ElementTree.ParseError as error:
                 raise UnsafeFeedURL("Invalid feed XML.") from error
-            parsed = feedparser.parse(body)
+            parsed = feedparser.parse(BytesIO(body))
             for link in parsed.feed.get("links", []):
                 if link.get("rel") == "next":
                     next_url = urljoin(response.url, link.get("href", ""))
