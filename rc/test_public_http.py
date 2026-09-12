@@ -2,11 +2,13 @@ import socket
 from unittest.mock import Mock, patch
 
 import requests
+from django.utils import timezone
 from django.test import SimpleTestCase, TestCase, RequestFactory
 from feeds.models import Source
 
+from rc.models import Subscription
 from rc.public_http import UnsafeFeedURL, public_get, resolve_public_url
-from rc.views import addfeed
+from rc.views import addfeed, feed
 
 
 def answer(ip):
@@ -162,6 +164,53 @@ class DiscoverySSRFTests(TestCase):
                 self.assertIn(b'"ok": true', result.content)
                 self.assertEqual(Source.objects.get().posts.count(), 2)
                 self.assertEqual(fetch.call_args.args[0], "https://podcast.example/page2")
+        self.unrestricted.assert_not_called()
+
+    def test_paginated_history_is_numbered_and_released_oldest_first(self):
+        newest = RSS.replace(
+            b"episode-one",
+            b"episode-newest",
+        ).replace(
+            b"<title>Episode one</title>",
+            b"<title>Newest episode</title><pubDate>Sat, 03 Jan 2026 00:00:00 GMT</pubDate>",
+        ).replace(
+            b"</channel>",
+            b'<atom:link rel="next" href="/page2"/></channel>',
+        )
+        oldest = RSS.replace(
+            b"episode-one",
+            b"episode-oldest",
+        ).replace(
+            b"<title>Episode one</title>",
+            b"<title>Oldest episode</title><pubDate>Thu, 01 Jan 2026 00:00:00 GMT</pubDate>",
+        )
+        with patch("rc.views.public_get", return_value=response(newest)):
+            with patch(
+                "rc.feed_import.public_get",
+                return_value=response(oldest, "https://podcast.example/page2"),
+            ):
+                result = self.submit()
+
+        self.assertIn(b'"ok": true', result.content)
+        source = Source.objects.get()
+        self.assertEqual(
+            list(source.posts.order_by("index").values_list("title", "index")),
+            [("Oldest episode", 1), ("Newest episode", 2)],
+        )
+        subscription = Subscription.objects.create(
+            key="chronological-replay",
+            source=source,
+            last_sent=1,
+            last_sent_date=timezone.now(),
+            frequency=5,
+            name=source.name,
+        )
+        request = RequestFactory().get(
+            "/feed/chronological-replay/", HTTP_HOST="testserver"
+        )
+        replay = feed(request, subscription.key)
+        self.assertContains(replay, "Oldest episode")
+        self.assertNotContains(replay, "Newest episode")
         self.unrestricted.assert_not_called()
 
     def test_json_import(self):

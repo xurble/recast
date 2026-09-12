@@ -4,9 +4,20 @@ from urllib.parse import urljoin
 from xml.etree import ElementTree
 
 import feedparser
+from feeds.models import Post
 from feeds.utils_internal import parse_feed
 
 from .public_http import UnsafeFeedURL, public_get
+
+
+def _finalize_initial_indices(source):
+    """Number the complete imported history from oldest to newest."""
+    posts = list(source.posts.order_by("created", "pk"))
+    for index, post in enumerate(posts, start=1):
+        post.index = index
+    Post.objects.bulk_update(posts, ["index"])
+    source.max_index = len(posts)
+    source.save(update_fields=["max_index"])
 
 
 def import_public_feed(source, response, headers):
@@ -45,6 +56,7 @@ def import_public_feed(source, response, headers):
             raise UnsafeFeedURL("The feed could not be imported.")
         source.save()
         if not next_url:
+            _finalize_initial_indices(source)
             return
         if page == 19:
             raise UnsafeFeedURL("Too many feed pages.")
