@@ -5,3 +5,5 @@ _staticfiles/
 
 server_settings.py
 *.ai
+
+.venv/

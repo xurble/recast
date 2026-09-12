@@ -8,6 +8,7 @@ from django.http import (
     JsonResponse,
     HttpResponsePermanentRedirect,
 )
+from django.db import transaction
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -26,10 +27,13 @@ import datetime
 import uuid
 import email
 import json
+from io import BytesIO
 
 import feedparser
 
 from .models import Subscription
+from .public_http import public_get, resolve_public_url
+from .feed_import import import_public_feed
 
 
 from bs4 import BeautifulSoup
@@ -326,9 +330,9 @@ def addfeed(request):
     elif request.method == "POST":
         try:
             source = None
-            proxies = None
 
             feed = request.POST["feed"]
+            resolve_public_url(feed)
 
             if request.META["HTTP_HOST"] in feed:
                 return HttpResponse(
@@ -353,7 +357,7 @@ def addfeed(request):
                     "Pragma": "no-cache",
                 }  # identify ourselves and also stop our requests getting picked up by google's cache
 
-                ret = requests.get(feed, headers=headers, proxies=proxies, timeout=30)
+                ret = public_get(feed, headers=headers, timeout=30)
                 # can I be bothered to check return codes here?  I think not on balance
 
                 if ret.status_code == 200:
@@ -365,7 +369,7 @@ def addfeed(request):
 
                     body = ret.text.strip()
                     if "xml" in content_type or body[0:1] == "<":
-                        ff = feedparser.parse(body)  # are we a feed?
+                        ff = feedparser.parse(BytesIO(ret.content))  # Parse data, never a URL/path.
                         isFeed = len(ff.entries) > 0
                         if isFeed:
                             feed_title = ff.feed.title
@@ -447,27 +451,26 @@ def addfeed(request):
 
             if isFeed and source is None:
                 # need to start checking feed parser errors here
-                source = Source()
-                source.due_poll = datetime.datetime.utcnow()
+                with transaction.atomic():
+                    source = Source()
+                    source.due_poll = timezone.now()
 
-                source.name = feed
-                try:
-                    source.name = feed_title
-                    source.site_url = feed_link
-                except Exception:
-                    pass
-                source.feed_url = feed
-                source.num_subs = 0
-                source.save()
+                    source.name = feed
+                    try:
+                        source.name = feed_title
+                        source.site_url = feed_link
+                    except Exception:
+                        pass
+                    source.feed_url = feed
+                    source.num_subs = 0
+                    source.save()
 
-                # import the entries now
-                (ok, changed) = read_feed(source)
+                    # import the entries now
+                    import_public_feed(source, ret, headers)
 
-                # TODO: Check the OK return val?  Surely that's a good idea
+                    source.last_change = timezone.now()
 
-                source.last_change = datetime.datetime.utcnow()
-
-                source.save()
+                    source.save()
 
             if request.POST.get("ajax", "nope") == "yep":
                 return JsonResponse(
@@ -476,11 +479,11 @@ def addfeed(request):
             else:
                 return HttpResponseRedirect(reverse("source", args=[source.id]))
 
-        except Exception as xx:
+        except Exception:
             return JsonResponse(
                 {
                     "ok": False,
-                    "reason": str(xx),
+                    "reason": "feed_unavailable",
                     "msg": "Recast could not connect to the podcast server.  You can try again, it might work 🤷‍.",
                 }
             )
