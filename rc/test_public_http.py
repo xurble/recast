@@ -1,10 +1,12 @@
+import json
 import socket
 from unittest.mock import Mock, patch
 
 import requests
 from django.utils import timezone
 from django.test import SimpleTestCase, TestCase, RequestFactory
-from feeds.models import Source
+from django.urls import reverse
+from feeds.models import Enclosure, Post, Source
 
 from rc.models import Subscription
 from rc.public_http import UnsafeFeedURL, public_get, resolve_public_url
@@ -30,6 +32,8 @@ RSS = b'''<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>
 <item><guid>episode-one</guid><title>Episode one</title><description>Body</description>
 <enclosure url="https://cdn.example/one.mp3" length="12" type="audio/mpeg"/>
 </item></channel></rss>'''
+
+JSON_FEED = b'{"version":"https://jsonfeed.org/version/1.1","title":"JSON podcast","home_page_url":"https://podcast.example/","items":[{"id":"one","title":"JSON episode","content_text":"body"}]}'
 
 
 class PublicHTTPTests(SimpleTestCase):
@@ -139,6 +143,7 @@ class DiscoverySSRFTests(TestCase):
             result = self.submit()
             self.assertIn(b'"ok": true', result.content)
             source = Source.objects.get()
+            self.assertEqual(json.loads(result.content), {"ok": True, "feed": reverse("source", args=[source.pk])})
             self.assertEqual(source.posts.count(), 1)
             self.assertEqual(source.posts.get().title, "Episode one")
             self.assertEqual(source.posts.get().enclosures.count(), 1)
@@ -214,11 +219,69 @@ class DiscoverySSRFTests(TestCase):
         self.unrestricted.assert_not_called()
 
     def test_json_import(self):
-        body = b'{"title":"JSON podcast","home_page_url":"https://podcast.example/","items":[{"id":"one","title":"JSON episode","content_text":"body"}]}'
-        with patch("rc.views.public_get", return_value=response(body, content_type="application/feed+json")):
+        with patch("rc.views.public_get", return_value=response(JSON_FEED, content_type="application/feed+json")):
             result = self.submit()
-            self.assertIn(b'"ok": true', result.content)
-            self.assertEqual(Source.objects.get().posts.get().title, "JSON episode")
+            source = Source.objects.get()
+            self.assertEqual(json.loads(result.content), {"ok": True, "feed": reverse("source", args=[source.pk])})
+            self.assertEqual(source.posts.get().title, "JSON episode")
+        self.unrestricted.assert_not_called()
+
+    def test_browser_import_redirects_to_created_xml_and_json_sources(self):
+        for body, content_type, title in [
+            (RSS, "application/rss+xml", "Episode one"),
+            (JSON_FEED, "application/feed+json", "JSON episode"),
+        ]:
+            with self.subTest(content_type=content_type):
+                url = "https://podcast.example/" + title.replace(" ", "-")
+                request = RequestFactory().post("/addfeed/", {"feed": url}, HTTP_HOST="testserver")
+                with patch("rc.views.public_get", return_value=response(body, url, content_type)) as fetch:
+                    result = addfeed(request)
+                source = Source.objects.get(feed_url=url)
+                self.assertEqual(result.status_code, 302)
+                self.assertEqual(result.url, reverse("source", args=[source.pk]))
+                self.assertEqual(source.posts.get().title, title)
+                self.assertEqual(source.max_index, 1)
+                fetch.assert_called_once()
+        self.unrestricted.assert_not_called()
+
+    def test_parser_rejection_rolls_back_already_imported_xml_page(self):
+        paged = RSS.replace(b"</channel>", b'<atom:link rel="next" href="/page2"/></channel>')
+        persisted_counts = []
+
+        def empty_second_page(*args, **kwargs):
+            # Confirm the first page really persisted before the parser rejects
+            # the empty second page, so this exercises transaction rollback.
+            persisted_counts.append((Source.objects.count(), Post.objects.count(), Enclosure.objects.count()))
+            return response(b"<rss><channel><title>Empty</title></channel></rss>",
+                            "https://podcast.example/page2")
+
+        with patch("rc.views.public_get", return_value=response(paged)):
+            with patch("rc.feed_import.public_get", side_effect=empty_second_page) as fetch:
+                result = self.submit()
+                fetch.assert_called_once()
+        self.assertEqual(persisted_counts, [(1, 1, 1)])
+        payload = json.loads(result.content)
+        self.assertIs(payload["ok"], False)
+        self.assertEqual(payload["reason"], "feed_unavailable")
+        self.assertNotIn("feed", payload)
+        self.assertEqual(Source.objects.count(), 0)
+        self.assertEqual(Post.objects.count(), 0)
+        self.assertEqual(Enclosure.objects.count(), 0)
+        self.unrestricted.assert_not_called()
+
+    def test_invalid_json_item_returns_import_failure(self):
+        # Discovery accepts the feed envelope, but the real pinned parser cannot
+        # import null content_text. Do not replace the parser with a success mock.
+        invalid = JSON_FEED.replace(b'"content_text":"body"', b'"content_text":null')
+        with patch("rc.views.public_get", return_value=response(invalid, content_type="application/feed+json")):
+            result = self.submit()
+        payload = json.loads(result.content)
+        self.assertIs(payload["ok"], False)
+        self.assertEqual(payload["reason"], "feed_unavailable")
+        self.assertNotIn("feed", payload)
+        self.assertEqual(Source.objects.count(), 0)
+        self.assertEqual(Post.objects.count(), 0)
+        self.assertEqual(Enclosure.objects.count(), 0)
         self.unrestricted.assert_not_called()
 
     def test_atom_import_preserves_namespaced_content(self):
