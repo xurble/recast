@@ -522,6 +522,6 @@ def reader(request):
 
     response["Content-Type"] = "text/plain"
 
-    update_feeds(response)
+    update_feeds(max_feeds=3, output=response)
 
     return response
