@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
 
 # Create your models here.
 
@@ -48,6 +50,32 @@ class Subscription(models.Model):
 
     class Meta:
         ordering = ["-last_accessed"]
+
+
+def _update_source_subscription_count(source_id, using):
+    count = Subscription.objects.using(using).filter(source_id=source_id).count()
+    Source.objects.using(using).filter(pk=source_id).update(num_subs=count)
+
+
+@receiver(
+    post_save,
+    sender=Subscription,
+    dispatch_uid="rc.subscription.update_source_count_after_create",
+)
+def update_source_subscription_count_after_create(
+    sender, instance, created, using, **kwargs
+):
+    if created:
+        _update_source_subscription_count(instance.source_id, using)
+
+
+@receiver(
+    post_delete,
+    sender=Subscription,
+    dispatch_uid="rc.subscription.update_source_count_after_delete",
+)
+def update_source_subscription_count_after_delete(sender, instance, using, **kwargs):
+    _update_source_subscription_count(instance.source_id, using)
 
 
 class SubscriptionPost(models.Model):

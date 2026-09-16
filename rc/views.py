@@ -497,9 +497,6 @@ def subscribe(request, sid):
         sub.last_sent_date = datetime.datetime.utcnow()
         sub.save()
 
-        s.num_subs = s.subscription_set.count()
-        s.save()
-
         messages.success(
             request,
             "Your new Recast feed has been created - subscribe to the link below in your Podcast App.",

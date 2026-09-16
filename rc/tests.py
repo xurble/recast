@@ -1,17 +1,96 @@
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.management import call_command
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.middleware.security import SecurityMiddleware
 from django.template.loader import render_to_string
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import resolve, reverse
 from django.utils import timezone
+from feeds.models import Source
 
+from .models import Subscription
 from .views import editfeed, feed
+
+
+class SubscriptionCountTests(TestCase):
+    def setUp(self):
+        self.source = Source.objects.create(
+            name="Test podcast",
+            feed_url="https://example.com/feed.xml",
+            num_subs=0,
+        )
+
+    def create_subscription(self, key):
+        return Subscription.objects.create(
+            source=self.source,
+            key=key,
+            name="Test podcast",
+            last_sent_date=timezone.now(),
+        )
+
+    def test_creation_updates_source_subscription_count(self):
+        self.create_subscription("first")
+        self.create_subscription("second")
+
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 2)
+
+    def test_admin_deletion_updates_source_subscription_count(self):
+        first = self.create_subscription("first")
+        self.create_subscription("second")
+        administrator = get_user_model().objects.create_superuser(
+            username="administrator",
+            email="admin@example.com",
+            password="password",
+        )
+        self.client.force_login(administrator)
+
+        response = self.client.post(
+            reverse("admin:rc_subscription_delete", args=[first.pk]),
+            {"post": "yes"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("admin:rc_subscription_changelist"))
+        self.assertFalse(Subscription.objects.filter(pk=first.pk).exists())
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 1)
+
+    def test_reconcile_subscription_counts_repairs_stale_values(self):
+        self.create_subscription("first")
+        Source.objects.filter(pk=self.source.pk).update(num_subs=99)
+        empty_source = Source.objects.create(
+            name="Empty podcast",
+            feed_url="https://example.com/empty.xml",
+            num_subs=99,
+        )
+
+        output = StringIO()
+        call_command("reconcile_subscription_counts", stdout=output)
+
+        self.source.refresh_from_db()
+        empty_source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 1)
+        self.assertEqual(empty_source.num_subs, 0)
+        self.assertIn("Updated 2 of 2 source counts.", output.getvalue())
+
+    def test_reconcile_subscription_counts_dry_run_does_not_write(self):
+        Source.objects.filter(pk=self.source.pk).update(num_subs=99)
+
+        output = StringIO()
+        call_command("reconcile_subscription_counts", "--dry-run", stdout=output)
+
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 99)
+        self.assertIn("Would update 1 of 1 source counts.", output.getvalue())
 
 
 class SubscriptionSettingsLinkTests(SimpleTestCase):
