@@ -9,9 +9,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.management import call_command
-from django.db import close_old_connections, connection
+from django.db import close_old_connections
 from django.db.models import QuerySet
-from django.db.utils import OperationalError
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.middleware.security import SecurityMiddleware
@@ -159,8 +158,8 @@ class ConcurrentSubscriptionCountTests(TransactionTestCase):
         )
 
     def test_reconciliation_cannot_double_count_a_creation(self):
+        Source.objects.filter(pk=self.source.pk).update(num_subs=99)
         counter_update_started = Event()
-        creation_finished = Event()
         reconciliation_started = Event()
         release_counter_update = Event()
         output = StringIO()
@@ -184,20 +183,13 @@ class ConcurrentSubscriptionCountTests(TransactionTestCase):
                     last_sent_date=timezone.now(),
                 )
             finally:
-                creation_finished.set()
                 close_old_connections()
 
         def reconcile_counts():
             close_old_connections()
             reconciliation_started.set()
             try:
-                try:
-                    call_command("reconcile_subscription_counts", stdout=output)
-                except OperationalError:
-                    if connection.vendor != "sqlite":
-                        raise
-                    creation_finished.wait(timeout=5)
-                    call_command("reconcile_subscription_counts", stdout=output)
+                call_command("reconcile_subscription_counts", stdout=output)
             finally:
                 close_old_connections()
 
@@ -223,6 +215,7 @@ class ConcurrentSubscriptionCountTests(TransactionTestCase):
 
         self.source.refresh_from_db()
         self.assertEqual(self.source.num_subs, 1)
+        self.assertIn("Updated 1 of 1 source counts.", output.getvalue())
         self.assertEqual(
             Subscription.objects.filter(source=self.source).count(),
             self.source.num_subs,

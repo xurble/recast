@@ -1,6 +1,9 @@
+import time
+
 from django.core.management.base import BaseCommand
-from django.db import DEFAULT_DB_ALIAS, transaction
+from django.db import DEFAULT_DB_ALIAS, connections, transaction
 from django.db.models import Count
+from django.db.utils import OperationalError
 from feeds.models import Source
 
 from rc.models import Subscription
@@ -25,6 +28,33 @@ class Command(BaseCommand):
         database = options["database"]
         dry_run = options["dry_run"]
 
+        connection = connections[database]
+        sqlite_timeout = float(
+            connection.settings_dict.get("OPTIONS", {}).get("timeout", 5)
+        )
+        retry_deadline = time.monotonic() + max(sqlite_timeout, 0)
+
+        while True:
+            try:
+                stale_sources, source_count = self._reconcile(database, dry_run)
+                break
+            except OperationalError as error:
+                is_sqlite_lock = connection.vendor == "sqlite" and (
+                    "locked" in str(error).lower() or "busy" in str(error).lower()
+                )
+                remaining = retry_deadline - time.monotonic()
+                if not is_sqlite_lock or remaining <= 0:
+                    raise
+                time.sleep(min(0.05, remaining))
+
+        action = "Would update" if dry_run else "Updated"
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{action} {len(stale_sources)} of {source_count} source counts."
+            )
+        )
+
+    def _reconcile(self, database, dry_run):
         with transaction.atomic(using=database):
             source_queryset = Source.objects.using(database).only("pk", "num_subs")
             if not dry_run:
@@ -50,9 +80,4 @@ class Command(BaseCommand):
                         num_subs=counts.get(source.pk, 0)
                     )
 
-        action = "Would update" if dry_run else "Updated"
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"{action} {len(stale_sources)} of {len(sources)} source counts."
-            )
-        )
+        return stale_sources, len(sources)
