@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from io import StringIO
 from threading import Event, local
 from types import SimpleNamespace
@@ -8,8 +9,9 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.management import call_command
-from django.db import close_old_connections
+from django.db import close_old_connections, connection
 from django.db.models import QuerySet
+from django.db.utils import OperationalError
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.middleware.security import SecurityMiddleware
@@ -151,6 +153,76 @@ class ConcurrentSubscriptionCountTests(TransactionTestCase):
 
         self.source.refresh_from_db()
         self.assertEqual(self.source.num_subs, 2)
+        self.assertEqual(
+            Subscription.objects.filter(source=self.source).count(),
+            self.source.num_subs,
+        )
+
+    def test_reconciliation_cannot_double_count_a_creation(self):
+        counter_update_started = Event()
+        creation_finished = Event()
+        reconciliation_started = Event()
+        release_counter_update = Event()
+        output = StringIO()
+
+        from . import models as rc_models
+
+        original_change_count = rc_models._change_source_subscription_count
+
+        def delay_counter_update(source_id, change, using):
+            counter_update_started.set()
+            release_counter_update.wait(timeout=5)
+            return original_change_count(source_id, change, using)
+
+        def create_subscription():
+            close_old_connections()
+            try:
+                Subscription.objects.create(
+                    source_id=self.source.pk,
+                    key="reconciled",
+                    name="Concurrent podcast",
+                    last_sent_date=timezone.now(),
+                )
+            finally:
+                creation_finished.set()
+                close_old_connections()
+
+        def reconcile_counts():
+            close_old_connections()
+            reconciliation_started.set()
+            try:
+                try:
+                    call_command("reconcile_subscription_counts", stdout=output)
+                except OperationalError:
+                    if connection.vendor != "sqlite":
+                        raise
+                    creation_finished.wait(timeout=5)
+                    call_command("reconcile_subscription_counts", stdout=output)
+            finally:
+                close_old_connections()
+
+        with (
+            patch(
+                "rc.models._change_source_subscription_count",
+                new=delay_counter_update,
+            ),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            creation = executor.submit(create_subscription)
+            self.assertTrue(counter_update_started.wait(timeout=5))
+            reconciliation = executor.submit(reconcile_counts)
+            self.assertTrue(reconciliation_started.wait(timeout=5))
+            try:
+                reconciliation.result(timeout=0.25)
+            except FutureTimeoutError:
+                pass
+            finally:
+                release_counter_update.set()
+            creation.result(timeout=5)
+            reconciliation.result(timeout=5)
+
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 1)
         self.assertEqual(
             Subscription.objects.filter(source=self.source).count(),
             self.source.num_subs,

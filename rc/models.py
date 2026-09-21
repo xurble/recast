@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, router, transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
@@ -30,6 +30,24 @@ class Subscription(models.Model):
     last_accessed = models.DateTimeField(auto_now_add=True, null=True)
     last_return_code = models.IntegerField(default=0)
     user_agent = models.CharField(max_length=512, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            return super().save(*args, **kwargs)
+
+        using = kwargs.get("using")
+        if using is None and len(args) >= 3:
+            using = args[2]
+        using = using or router.db_for_write(type(self), instance=self)
+
+        with transaction.atomic(using=using):
+            # A no-op update takes a real write lock on SQLite as well as a row
+            # lock on production databases, and keeps reconciliation from
+            # observing the insert before its counter update.
+            Source.objects.using(using).filter(pk=self.source_id).update(
+                num_subs=models.F("num_subs")
+            )
+            return super().save(*args, **kwargs)
 
     def __str__(self):
         return "'%s' on id %s" % (self.name, self.key)
