@@ -52,9 +52,10 @@ class Subscription(models.Model):
         ordering = ["-last_accessed"]
 
 
-def _update_source_subscription_count(source_id, using):
-    count = Subscription.objects.using(using).filter(source_id=source_id).count()
-    Source.objects.using(using).filter(pk=source_id).update(num_subs=count)
+def _change_source_subscription_count(source_id, change, using):
+    Source.objects.using(using).filter(pk=source_id).update(
+        num_subs=models.F("num_subs") + change
+    )
 
 
 @receiver(
@@ -66,7 +67,7 @@ def update_source_subscription_count_after_create(
     sender, instance, created, using, **kwargs
 ):
     if created:
-        _update_source_subscription_count(instance.source_id, using)
+        _change_source_subscription_count(instance.source_id, 1, using)
 
 
 @receiver(
@@ -75,7 +76,7 @@ def update_source_subscription_count_after_create(
     dispatch_uid="rc.subscription.update_source_count_after_delete",
 )
 def update_source_subscription_count_after_delete(sender, instance, using, **kwargs):
-    _update_source_subscription_count(instance.source_id, using)
+    _change_source_subscription_count(instance.source_id, -1, using)
 
 
 class SubscriptionPost(models.Model):

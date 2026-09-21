@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
+from threading import Event, local
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -6,11 +8,19 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.management import call_command
+from django.db import close_old_connections
+from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.middleware.security import SecurityMiddleware
 from django.template.loader import render_to_string
-from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
+from django.test import (
+    RequestFactory,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+    override_settings,
+)
 from django.urls import resolve, reverse
 from django.utils import timezone
 from feeds.models import Source
@@ -91,6 +101,60 @@ class SubscriptionCountTests(TestCase):
         self.source.refresh_from_db()
         self.assertEqual(self.source.num_subs, 99)
         self.assertIn("Would update 1 of 1 source counts.", output.getvalue())
+
+
+class ConcurrentSubscriptionCountTests(TransactionTestCase):
+    def setUp(self):
+        self.source = Source.objects.create(
+            name="Concurrent podcast",
+            feed_url="https://example.com/concurrent.xml",
+            num_subs=0,
+        )
+
+    def test_competing_creations_do_not_overwrite_a_newer_count(self):
+        first_update_started = Event()
+        release_first_update = Event()
+        worker_state = local()
+        original_update = QuerySet.update
+
+        def coordinate_source_updates(queryset, **kwargs):
+            if queryset.model is Source and getattr(worker_state, "delay", False):
+                first_update_started.set()
+                release_first_update.wait(timeout=5)
+            return original_update(queryset, **kwargs)
+
+        def create_subscription(key, *, delay):
+            close_old_connections()
+            worker_state.delay = delay
+            try:
+                Subscription.objects.create(
+                    source_id=self.source.pk,
+                    key=key,
+                    name="Concurrent podcast",
+                    last_sent_date=timezone.now(),
+                )
+            finally:
+                close_old_connections()
+
+        with (
+            patch.object(QuerySet, "update", new=coordinate_source_updates),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            first = executor.submit(create_subscription, "first", delay=True)
+            self.assertTrue(first_update_started.wait(timeout=5))
+            second = executor.submit(create_subscription, "second", delay=False)
+            try:
+                second.result(timeout=5)
+            finally:
+                release_first_update.set()
+            first.result(timeout=5)
+
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 2)
+        self.assertEqual(
+            Subscription.objects.filter(source=self.source).count(),
+            self.source.num_subs,
+        )
 
 
 class SubscriptionSettingsLinkTests(SimpleTestCase):
