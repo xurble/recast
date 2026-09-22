@@ -33,10 +33,13 @@ class Command(BaseCommand):
             connection.settings_dict.get("OPTIONS", {}).get("timeout", 5)
         )
         retry_deadline = time.monotonic() + max(sqlite_timeout, 0)
+        updated_source_ids = set()
 
         while True:
             try:
-                stale_sources, source_count = self._reconcile(database, dry_run)
+                stale_sources, source_count = self._reconcile(
+                    database, dry_run, updated_source_ids
+                )
                 break
             except OperationalError as error:
                 is_sqlite_lock = connection.vendor == "sqlite" and (
@@ -54,12 +57,11 @@ class Command(BaseCommand):
             )
         )
 
-    def _reconcile(self, database, dry_run):
-        with transaction.atomic(using=database):
-            source_queryset = Source.objects.using(database).only("pk", "num_subs")
-            if not dry_run:
-                source_queryset = source_queryset.select_for_update()
-            sources = list(source_queryset)
+    def _reconcile(self, database, dry_run, updated_source_ids):
+        source_queryset = Source.objects.using(database).order_by("pk")
+
+        if dry_run:
+            sources = list(source_queryset.only("pk", "num_subs"))
             counts = {
                 row["source_id"]: row["total"]
                 for row in (
@@ -73,11 +75,34 @@ class Command(BaseCommand):
                 for source in sources
                 if source.num_subs != counts.get(source.pk, 0)
             ]
+            return stale_sources, len(sources)
 
-            if not dry_run:
-                for source in stale_sources:
-                    Source.objects.using(database).filter(pk=source.pk).update(
-                        num_subs=counts.get(source.pk, 0)
+        source_ids = list(source_queryset.values_list("pk", flat=True))
+        source_count = len(source_ids)
+        for source_id in source_ids:
+            source_updated = False
+            with transaction.atomic(using=database):
+                try:
+                    source = (
+                        Source.objects.using(database)
+                        .select_for_update()
+                        .only("pk", "num_subs")
+                        .get(pk=source_id)
                     )
+                except Source.DoesNotExist:
+                    continue
 
-        return stale_sources, len(sources)
+                count = (
+                    Subscription.objects.using(database)
+                    .filter(source_id=source_id)
+                    .count()
+                )
+                if source.num_subs != count:
+                    Source.objects.using(database).filter(pk=source.pk).update(
+                        num_subs=count
+                    )
+                    source_updated = True
+            if source_updated:
+                updated_source_ids.add(source_id)
+
+        return updated_source_ids, source_count

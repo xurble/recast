@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.management import call_command
-from django.db import close_old_connections
+from django.db import close_old_connections, transaction
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
@@ -75,6 +75,27 @@ class SubscriptionCountTests(TestCase):
         self.source.refresh_from_db()
         self.assertEqual(self.source.num_subs, 1)
 
+    def test_bulk_deletion_updates_multiple_source_counts(self):
+        first = self.create_subscription("first")
+        second_source = Source.objects.create(
+            name="Second podcast",
+            feed_url="https://example.com/second.xml",
+            num_subs=0,
+        )
+        second = Subscription.objects.create(
+            source=second_source,
+            key="second",
+            name="Second podcast",
+            last_sent_date=timezone.now(),
+        )
+
+        Subscription.objects.filter(pk__in=[first.pk, second.pk]).delete()
+
+        self.source.refresh_from_db()
+        second_source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 0)
+        self.assertEqual(second_source.num_subs, 0)
+
     def test_reconcile_subscription_counts_repairs_stale_values(self):
         self.create_subscription("first")
         Source.objects.filter(pk=self.source.pk).update(num_subs=99)
@@ -102,6 +123,30 @@ class SubscriptionCountTests(TestCase):
         self.source.refresh_from_db()
         self.assertEqual(self.source.num_subs, 99)
         self.assertIn("Would update 1 of 1 source counts.", output.getvalue())
+
+    def test_reconcile_locks_each_source_in_a_separate_transaction(self):
+        Source.objects.filter(pk=self.source.pk).update(num_subs=99)
+        Source.objects.create(
+            name="Second podcast",
+            feed_url="https://example.com/second.xml",
+            num_subs=99,
+        )
+        output = StringIO()
+
+        with patch(
+            "rc.management.commands.reconcile_subscription_counts.transaction.atomic",
+            wraps=transaction.atomic,
+        ) as atomic:
+            call_command("reconcile_subscription_counts", stdout=output)
+
+        self.assertEqual(atomic.call_count, 2)
+        self.assertTrue(
+            all(
+                call.kwargs == {"using": "default"}
+                for call in atomic.call_args_list
+            )
+        )
+        self.assertIn("Updated 2 of 2 source counts.", output.getvalue())
 
 
 class ConcurrentSubscriptionCountTests(TransactionTestCase):
