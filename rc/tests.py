@@ -11,6 +11,7 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.management import call_command
 from django.db import close_old_connections, transaction
 from django.db.models import QuerySet
+from django.db.utils import OperationalError
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.middleware.security import SecurityMiddleware
@@ -146,6 +147,40 @@ class SubscriptionCountTests(TestCase):
                 for call in atomic.call_args_list
             )
         )
+        self.assertIn("Updated 2 of 2 source counts.", output.getvalue())
+
+    def test_reconcile_retry_reports_the_cumulative_source_population(self):
+        output = StringIO()
+        attempts = 0
+
+        def reconcile(
+            command,
+            database,
+            dry_run,
+            encountered_source_ids,
+            updated_source_ids,
+        ):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                encountered_source_ids.update({1, 2})
+                updated_source_ids.add(1)
+                raise OperationalError("database is locked")
+
+            encountered_source_ids.add(2)
+            updated_source_ids.add(2)
+            return updated_source_ids, len(encountered_source_ids)
+
+        with (
+            patch(
+                "rc.management.commands.reconcile_subscription_counts.Command._reconcile",
+                new=reconcile,
+            ),
+            patch("rc.management.commands.reconcile_subscription_counts.time.sleep"),
+        ):
+            call_command("reconcile_subscription_counts", stdout=output)
+
+        self.assertEqual(attempts, 2)
         self.assertIn("Updated 2 of 2 source counts.", output.getvalue())
 
 

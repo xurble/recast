@@ -33,12 +33,16 @@ class Command(BaseCommand):
             connection.settings_dict.get("OPTIONS", {}).get("timeout", 5)
         )
         retry_deadline = time.monotonic() + max(sqlite_timeout, 0)
+        encountered_source_ids = set()
         updated_source_ids = set()
 
         while True:
             try:
                 stale_sources, source_count = self._reconcile(
-                    database, dry_run, updated_source_ids
+                    database,
+                    dry_run,
+                    encountered_source_ids,
+                    updated_source_ids,
                 )
                 break
             except OperationalError as error:
@@ -57,7 +61,9 @@ class Command(BaseCommand):
             )
         )
 
-    def _reconcile(self, database, dry_run, updated_source_ids):
+    def _reconcile(
+        self, database, dry_run, encountered_source_ids, updated_source_ids
+    ):
         source_queryset = Source.objects.using(database).order_by("pk")
 
         if dry_run:
@@ -78,7 +84,7 @@ class Command(BaseCommand):
             return stale_sources, len(sources)
 
         source_ids = list(source_queryset.values_list("pk", flat=True))
-        source_count = len(source_ids)
+        encountered_source_ids.update(source_ids)
         for source_id in source_ids:
             source_updated = False
             with transaction.atomic(using=database):
@@ -105,4 +111,4 @@ class Command(BaseCommand):
             if source_updated:
                 updated_source_ids.add(source_id)
 
-        return updated_source_ids, source_count
+        return updated_source_ids, len(encountered_source_ids)
