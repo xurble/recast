@@ -97,6 +97,18 @@ class SubscriptionCountTests(TestCase):
         self.assertEqual(self.source.num_subs, 0)
         self.assertEqual(second_source.num_subs, 0)
 
+    def test_deleting_stale_duplicate_instance_is_idempotent(self):
+        first = self.create_subscription("first")
+        self.create_subscription("second")
+        stale_first = Subscription.objects.get(pk=first.pk)
+
+        first.delete()
+        stale_first.delete()
+
+        self.source.refresh_from_db()
+        self.assertEqual(Subscription.objects.filter(source=self.source).count(), 1)
+        self.assertEqual(self.source.num_subs, 1)
+
     def test_reconcile_subscription_counts_repairs_stale_values(self):
         self.create_subscription("first")
         Source.objects.filter(pk=self.source.pk).update(num_subs=99)
