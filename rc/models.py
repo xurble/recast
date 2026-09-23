@@ -70,12 +70,6 @@ class Subscription(models.Model):
         ordering = ["-last_accessed"]
 
 
-def _change_source_subscription_count(source_id, change, using):
-    Source.objects.using(using).filter(pk=source_id).update(
-        num_subs=models.F("num_subs") + change
-    )
-
-
 def _recount_source_subscriptions(source_id, using):
     with transaction.atomic(using=using):
         source = (
@@ -100,7 +94,7 @@ def update_source_subscription_count_after_create(
     sender, instance, created, using, **kwargs
 ):
     if created:
-        _change_source_subscription_count(instance.source_id, 1, using)
+        _recount_source_subscriptions(instance.source_id, using)
 
 
 @receiver(

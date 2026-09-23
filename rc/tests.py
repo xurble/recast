@@ -54,6 +54,23 @@ class SubscriptionCountTests(TestCase):
         self.source.refresh_from_db()
         self.assertEqual(self.source.num_subs, 2)
 
+    def test_creation_replaces_the_source_default_with_the_actual_count(self):
+        source = Source.objects.create(
+            name="Default-count podcast",
+            feed_url="https://example.com/default-count.xml",
+        )
+        self.assertEqual(source.num_subs, 1)
+
+        Subscription.objects.create(
+            source=source,
+            key="default-count",
+            name="Default-count podcast",
+            last_sent_date=timezone.now(),
+        )
+
+        source.refresh_from_db()
+        self.assertEqual(source.num_subs, 1)
+
     def test_admin_deletion_updates_source_subscription_count(self):
         first = self.create_subscription("first")
         self.create_subscription("second")
@@ -258,12 +275,12 @@ class ConcurrentSubscriptionCountTests(TransactionTestCase):
 
         from . import models as rc_models
 
-        original_change_count = rc_models._change_source_subscription_count
+        original_recount = rc_models._recount_source_subscriptions
 
-        def delay_counter_update(source_id, change, using):
+        def delay_counter_update(source_id, using):
             counter_update_started.set()
             release_counter_update.wait(timeout=5)
-            return original_change_count(source_id, change, using)
+            return original_recount(source_id, using)
 
         def create_subscription():
             close_old_connections()
@@ -287,7 +304,7 @@ class ConcurrentSubscriptionCountTests(TransactionTestCase):
 
         with (
             patch(
-                "rc.models._change_source_subscription_count",
+                "rc.models._recount_source_subscriptions",
                 new=delay_counter_update,
             ),
             ThreadPoolExecutor(max_workers=2) as executor,
@@ -307,7 +324,7 @@ class ConcurrentSubscriptionCountTests(TransactionTestCase):
 
         self.source.refresh_from_db()
         self.assertEqual(self.source.num_subs, 1)
-        self.assertIn("Updated 1 of 1 source counts.", output.getvalue())
+        self.assertIn("Updated 0 of 1 source counts.", output.getvalue())
         self.assertEqual(
             Subscription.objects.filter(source=self.source).count(),
             self.source.num_subs,
