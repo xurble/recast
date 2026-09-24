@@ -1,17 +1,334 @@
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
+from io import StringIO
+from threading import Event, local
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.management import call_command
+from django.db import close_old_connections, transaction
+from django.db.models import QuerySet
+from django.db.utils import OperationalError
 from django.http import HttpResponse
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from django.middleware.security import SecurityMiddleware
 from django.template.loader import render_to_string
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import (
+    RequestFactory,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+    override_settings,
+)
 from django.urls import resolve, reverse
 from django.utils import timezone
+from feeds.models import Source
 
+from .models import Subscription
 from .views import editfeed, feed
+
+
+class SubscriptionCountTests(TestCase):
+    def setUp(self):
+        self.source = Source.objects.create(
+            name="Test podcast",
+            feed_url="https://example.com/feed.xml",
+            num_subs=0,
+        )
+
+    def create_subscription(self, key):
+        return Subscription.objects.create(
+            source=self.source,
+            key=key,
+            name="Test podcast",
+            last_sent_date=timezone.now(),
+        )
+
+    def test_creation_updates_source_subscription_count(self):
+        self.create_subscription("first")
+        self.create_subscription("second")
+
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 2)
+
+    def test_creation_replaces_the_source_default_with_the_actual_count(self):
+        source = Source.objects.create(
+            name="Default-count podcast",
+            feed_url="https://example.com/default-count.xml",
+        )
+        self.assertEqual(source.num_subs, 1)
+
+        Subscription.objects.create(
+            source=source,
+            key="default-count",
+            name="Default-count podcast",
+            last_sent_date=timezone.now(),
+        )
+
+        source.refresh_from_db()
+        self.assertEqual(source.num_subs, 1)
+
+    def test_admin_deletion_updates_source_subscription_count(self):
+        first = self.create_subscription("first")
+        self.create_subscription("second")
+        administrator = get_user_model().objects.create_superuser(
+            username="administrator",
+            email="admin@example.com",
+            password="password",
+        )
+        self.client.force_login(administrator)
+
+        response = self.client.post(
+            reverse("admin:rc_subscription_delete", args=[first.pk]),
+            {"post": "yes"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("admin:rc_subscription_changelist"))
+        self.assertFalse(Subscription.objects.filter(pk=first.pk).exists())
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 1)
+
+    def test_bulk_deletion_updates_multiple_source_counts(self):
+        first = self.create_subscription("first")
+        second_source = Source.objects.create(
+            name="Second podcast",
+            feed_url="https://example.com/second.xml",
+            num_subs=0,
+        )
+        second = Subscription.objects.create(
+            source=second_source,
+            key="second",
+            name="Second podcast",
+            last_sent_date=timezone.now(),
+        )
+
+        Subscription.objects.filter(pk__in=[first.pk, second.pk]).delete()
+
+        self.source.refresh_from_db()
+        second_source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 0)
+        self.assertEqual(second_source.num_subs, 0)
+
+    def test_deleting_stale_duplicate_instance_is_idempotent(self):
+        first = self.create_subscription("first")
+        self.create_subscription("second")
+        stale_first = Subscription.objects.get(pk=first.pk)
+
+        first.delete()
+        stale_first.delete()
+
+        self.source.refresh_from_db()
+        self.assertEqual(Subscription.objects.filter(source=self.source).count(), 1)
+        self.assertEqual(self.source.num_subs, 1)
+
+    def test_reconcile_subscription_counts_repairs_stale_values(self):
+        self.create_subscription("first")
+        Source.objects.filter(pk=self.source.pk).update(num_subs=99)
+        empty_source = Source.objects.create(
+            name="Empty podcast",
+            feed_url="https://example.com/empty.xml",
+            num_subs=99,
+        )
+
+        output = StringIO()
+        call_command("reconcile_subscription_counts", stdout=output)
+
+        self.source.refresh_from_db()
+        empty_source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 1)
+        self.assertEqual(empty_source.num_subs, 0)
+        self.assertIn("Updated 2 of 2 source counts.", output.getvalue())
+
+    def test_reconcile_subscription_counts_dry_run_does_not_write(self):
+        Source.objects.filter(pk=self.source.pk).update(num_subs=99)
+
+        output = StringIO()
+        call_command("reconcile_subscription_counts", "--dry-run", stdout=output)
+
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 99)
+        self.assertIn("Would update 1 of 1 source counts.", output.getvalue())
+
+    def test_reconcile_locks_each_source_in_a_separate_transaction(self):
+        Source.objects.filter(pk=self.source.pk).update(num_subs=99)
+        Source.objects.create(
+            name="Second podcast",
+            feed_url="https://example.com/second.xml",
+            num_subs=99,
+        )
+        output = StringIO()
+
+        with patch(
+            "rc.management.commands.reconcile_subscription_counts.transaction.atomic",
+            wraps=transaction.atomic,
+        ) as atomic:
+            call_command("reconcile_subscription_counts", stdout=output)
+
+        self.assertEqual(atomic.call_count, 2)
+        self.assertTrue(
+            all(
+                call.kwargs == {"using": "default"}
+                for call in atomic.call_args_list
+            )
+        )
+        self.assertIn("Updated 2 of 2 source counts.", output.getvalue())
+
+    def test_reconcile_retry_reports_the_cumulative_source_population(self):
+        output = StringIO()
+        attempts = 0
+
+        def reconcile(
+            command,
+            database,
+            dry_run,
+            encountered_source_ids,
+            updated_source_ids,
+        ):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                encountered_source_ids.update({1, 2})
+                updated_source_ids.add(1)
+                raise OperationalError("database is locked")
+
+            encountered_source_ids.add(2)
+            updated_source_ids.add(2)
+            return updated_source_ids, len(encountered_source_ids)
+
+        with (
+            patch(
+                "rc.management.commands.reconcile_subscription_counts.Command._reconcile",
+                new=reconcile,
+            ),
+            patch("rc.management.commands.reconcile_subscription_counts.time.sleep"),
+        ):
+            call_command("reconcile_subscription_counts", stdout=output)
+
+        self.assertEqual(attempts, 2)
+        self.assertIn("Updated 2 of 2 source counts.", output.getvalue())
+
+
+class ConcurrentSubscriptionCountTests(TransactionTestCase):
+    def setUp(self):
+        self.source = Source.objects.create(
+            name="Concurrent podcast",
+            feed_url="https://example.com/concurrent.xml",
+            num_subs=0,
+        )
+
+    def test_competing_creations_do_not_overwrite_a_newer_count(self):
+        first_update_started = Event()
+        release_first_update = Event()
+        worker_state = local()
+        original_update = QuerySet.update
+
+        def coordinate_source_updates(queryset, **kwargs):
+            if queryset.model is Source and getattr(worker_state, "delay", False):
+                first_update_started.set()
+                release_first_update.wait(timeout=5)
+            return original_update(queryset, **kwargs)
+
+        def create_subscription(key, *, delay):
+            close_old_connections()
+            worker_state.delay = delay
+            try:
+                Subscription.objects.create(
+                    source_id=self.source.pk,
+                    key=key,
+                    name="Concurrent podcast",
+                    last_sent_date=timezone.now(),
+                )
+            finally:
+                close_old_connections()
+
+        with (
+            patch.object(QuerySet, "update", new=coordinate_source_updates),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            first = executor.submit(create_subscription, "first", delay=True)
+            self.assertTrue(first_update_started.wait(timeout=5))
+            second = executor.submit(create_subscription, "second", delay=False)
+            try:
+                second.result(timeout=5)
+            finally:
+                release_first_update.set()
+            first.result(timeout=5)
+
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 2)
+        self.assertEqual(
+            Subscription.objects.filter(source=self.source).count(),
+            self.source.num_subs,
+        )
+
+    def test_reconciliation_cannot_double_count_a_creation(self):
+        Source.objects.filter(pk=self.source.pk).update(num_subs=99)
+        counter_update_started = Event()
+        reconciliation_started = Event()
+        release_counter_update = Event()
+        output = StringIO()
+
+        from . import models as rc_models
+
+        original_recount = rc_models._recount_source_subscriptions
+
+        def delay_counter_update(source_id, using):
+            counter_update_started.set()
+            release_counter_update.wait(timeout=5)
+            return original_recount(source_id, using)
+
+        def create_subscription():
+            close_old_connections()
+            try:
+                Subscription.objects.create(
+                    source_id=self.source.pk,
+                    key="reconciled",
+                    name="Concurrent podcast",
+                    last_sent_date=timezone.now(),
+                )
+            finally:
+                close_old_connections()
+
+        def reconcile_counts():
+            close_old_connections()
+            reconciliation_started.set()
+            try:
+                call_command("reconcile_subscription_counts", stdout=output)
+            finally:
+                close_old_connections()
+
+        with (
+            patch(
+                "rc.models._recount_source_subscriptions",
+                new=delay_counter_update,
+            ),
+            ThreadPoolExecutor(max_workers=2) as executor,
+        ):
+            creation = executor.submit(create_subscription)
+            self.assertTrue(counter_update_started.wait(timeout=5))
+            reconciliation = executor.submit(reconcile_counts)
+            self.assertTrue(reconciliation_started.wait(timeout=5))
+            try:
+                reconciliation.result(timeout=0.25)
+            except FutureTimeoutError:
+                pass
+            finally:
+                release_counter_update.set()
+            creation.result(timeout=5)
+            reconciliation.result(timeout=5)
+
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.num_subs, 1)
+        self.assertIn("Updated 0 of 1 source counts.", output.getvalue())
+        self.assertEqual(
+            Subscription.objects.filter(source=self.source).count(),
+            self.source.num_subs,
+        )
 
 
 class SubscriptionSettingsLinkTests(SimpleTestCase):
