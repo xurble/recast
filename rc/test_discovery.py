@@ -1,6 +1,7 @@
 import gzip
 import io
 import json
+import socket
 import subprocess
 import sys
 import threading
@@ -47,26 +48,33 @@ class Raw(io.BytesIO):
 
 
 def response(body=RSS, headers=None, status=200):
-    result = Mock(status_code=status, headers=headers or {"Content-Type": "application/rss+xml"})
+    result = Mock(status=status, headers=headers or {"Content-Type": "application/rss+xml"})
     result.raw = Raw(body)
-    result.__enter__ = Mock(return_value=result)
-    def close(*args):
+    result.read = result.raw.read
+    def close():
         result.raw.close()
-        return False
-    result.__exit__ = Mock(side_effect=close)
+    result.close = Mock(side_effect=close)
     return result
 
 
 class FetchTests(SimpleTestCase):
     def fetch(self, reply, policy=None):
-        with patch.object(worker.requests, "Session") as factory:
-            session = factory.return_value.__enter__.return_value
-            session.get.return_value = reply
+        resolved = (URL, "podcast.example", 443, "93.184.216.34", "podcast.example")
+        with patch.object(worker, "resolve_public_url", return_value=resolved), \
+                patch.object(worker.urllib3, "HTTPSConnectionPool") as factory:
+            pool = factory.return_value.__enter__.return_value
+            pool.urlopen.return_value = reply
             result = worker.fetch(URL, policy or discovery.DEFAULT_LIMITS, "test")
-            session.get.assert_called_once()
-            self.assertTrue(session.get.call_args.kwargs["stream"])
-            self.assertFalse(session.get.call_args.kwargs["allow_redirects"])
-            self.assertFalse(session.trust_env)
+            pool.urlopen.assert_called_once()
+            self.assertFalse(pool.urlopen.call_args.kwargs["redirect"])
+            self.assertFalse(pool.urlopen.call_args.kwargs["preload_content"])
+            self.assertFalse(pool.urlopen.call_args.kwargs["decode_content"])
+            self.assertEqual(pool.urlopen.call_args.kwargs["headers"]["Host"], "podcast.example")
+            factory.assert_called_once_with(
+                "93.184.216.34", port=443, cert_reqs="CERT_REQUIRED",
+                ca_certs=worker.requests.certs.where(), assert_hostname="podcast.example",
+                server_hostname="podcast.example",
+            )
         self.assertTrue(reply.raw.closed)
         return result
 
@@ -98,16 +106,18 @@ class FetchTests(SimpleTestCase):
                 self.fetch(response(body, {"Content-Encoding": encoding}))
 
     def test_redirects_do_not_read_bodies_and_share_hop_limit(self):
-        with patch.object(worker.requests, "Session") as factory:
-            session = factory.return_value.__enter__.return_value
+        resolved = (URL, "podcast.example", 443, "93.184.216.34", "podcast.example")
+        with patch.object(worker, "resolve_public_url", return_value=resolved) as resolve, \
+                patch.object(worker.urllib3, "HTTPSConnectionPool") as factory:
+            pool = factory.return_value.__enter__.return_value
             redirect = response(headers={"Location": "/next"}, status=302)
             redirect.raw = Mock()
-            session.get.return_value = redirect
+            pool.urlopen.return_value = redirect
             with self.assertRaises(worker.DiscoveryError):
                 worker.fetch(URL, discovery.DEFAULT_LIMITS, "test")
-            self.assertEqual(session.get.call_count, 4)
+            self.assertEqual(pool.urlopen.call_count, 4)
+            self.assertEqual(resolve.call_count, 4)
             redirect.raw.read.assert_not_called()
-            self.assertEqual(session.get.call_args.args[0], "https://podcast.example/next")
 
     def test_remote_error_does_not_read_body(self):
         reply = response(headers={"Server": "cloudflare"}, status=403)
@@ -116,6 +126,26 @@ class FetchTests(SimpleTestCase):
             self.fetch(reply)
         self.assertEqual(error.exception.reason, "cloudflare")
         reply.raw.read.assert_not_called()
+
+    def test_private_destination_is_rejected_before_connection(self):
+        private = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 80))]
+        with patch("rc.public_http.socket.getaddrinfo", return_value=private), \
+                patch.object(worker.urllib3, "HTTPConnectionPool") as pool, \
+                self.assertRaises(worker.DiscoveryError) as error:
+            worker.fetch("http://private.example/feed", discovery.DEFAULT_LIMITS, "test")
+        self.assertEqual(error.exception.reason, "invalid")
+        pool.assert_not_called()
+
+    def test_redirect_to_private_destination_is_rejected_before_connection(self):
+        public = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 80))]
+        private = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", 80))]
+        redirect = response(headers={"Location": "http://metadata.example/latest"}, status=302)
+        with patch("rc.public_http.socket.getaddrinfo", side_effect=[public, private]), \
+                patch.object(worker.urllib3, "HTTPConnectionPool") as pool, \
+                self.assertRaises(worker.DiscoveryError):
+            pool.return_value.__enter__.return_value.urlopen.return_value = redirect
+            worker.fetch("http://public.example/feed", discovery.DEFAULT_LIMITS, "test")
+        self.assertEqual(pool.call_count, 1)
 
 
 class ParseTests(SimpleTestCase):

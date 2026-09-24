@@ -14,8 +14,11 @@ from xml.parsers import expat
 
 import feedparser
 import requests
+import urllib3
 from bs4 import BeautifulSoup
 from feedparser.sanitizer import _sanitize_html
+
+from .public_http import UnsafeFeedURL, resolve_public_url
 
 
 class DiscoveryError(Exception):
@@ -40,49 +43,70 @@ def http_url(value):
 
 def fetch(url, limits, agent):
     headers = {"User-Agent": agent, "Accept-Encoding": "gzip, identity"}
-    # Automatic redirects can buffer redirect bodies even when stream=True.
-    # Handle each hop ourselves, closing it without reading its body.
-    with requests.Session() as session:
-        session.trust_env = False
-        for hop in range(limits["redirects"] + 1):
-            with session.get(http_url(url), headers=headers, stream=True,
-                             allow_redirects=False, timeout=(3, 3)) as response:
-                if response.status_code in {301, 302, 303, 307, 308}:
-                    if hop == limits["redirects"] or not response.headers.get("Location"):
-                        raise DiscoveryError("The feed redirected too many times.")
-                    url = http_url(urljoin(url, response.headers["Location"]))
-                    continue
-                if response.status_code != 200:
-                    reason = "cloudflare" if response.status_code == 403 and "cloudflare" in response.headers.get("Server", "").lower() else str(response.status_code)
-                    raise DiscoveryError("The podcast server refused the request.", reason, 502)
-                encoding = response.headers.get("Content-Encoding", "identity").strip().lower()
-                if encoding not in {"identity", "gzip"}:
-                    raise DiscoveryError("The feed uses unsupported compression.")
-                length = response.headers.get("Content-Length")
-                if length and int(length) > limits["wire_bytes"]:
-                    raise DiscoveryError("The feed response is too large.")
-                decoder = zlib.decompressobj(16 + zlib.MAX_WBITS) if encoding == "gzip" else None
-                body = bytearray()
-                wire = 0
-                # Disable urllib3's automatic decompression: even one decoded
-                # chunk can otherwise allocate the entire compression bomb.
-                while True:
-                    chunk = response.raw.read(16 * 1024, decode_content=False)
-                    if not chunk:
-                        break
-                    wire += len(chunk)
-                    if wire > limits["wire_bytes"]:
-                        raise DiscoveryError("The feed response is too large.")
-                    remaining = limits["body_bytes"] - len(body)
-                    decoded = decoder.decompress(chunk, remaining + 1) if decoder else chunk
-                    if len(decoded) > remaining or (decoder and decoder.unconsumed_tail):
-                        raise DiscoveryError("The expanded feed is too large.")
-                    body.extend(decoded)
-                    if decoder and decoder.unused_data:
-                        raise DiscoveryError("Concatenated or trailing compressed data is not supported.")
-                if decoder and not decoder.eof:
-                    raise DiscoveryError("The compressed feed is incomplete.", "invalid")
-                return bytes(body), response.headers.get("Content-Type", ""), url
+    for hop in range(limits["redirects"] + 1):
+        try:
+            normalized, hostname, port, address, authority = resolve_public_url(http_url(url))
+        except UnsafeFeedURL as error:
+            raise DiscoveryError("A public HTTP(S) feed URL is required.", "invalid") from error
+        parts = urlsplit(normalized)
+        target = requests.Request("GET", normalized).prepare().path_url
+        request_headers = headers | {"Host": authority}
+        pool_class = urllib3.HTTPConnectionPool
+        options = {}
+        if parts.scheme == "https":
+            pool_class = urllib3.HTTPSConnectionPool
+            options = {"cert_reqs": "CERT_REQUIRED", "ca_certs": requests.certs.where(),
+                       "assert_hostname": hostname, "server_hostname": hostname}
+        try:
+            with pool_class(address, port=port, **options) as pool:
+                response = pool.urlopen(
+                    "GET", target, headers=request_headers,
+                    timeout=urllib3.Timeout(connect=3, read=3), redirect=False,
+                    retries=False, preload_content=False, decode_content=False,
+                )
+                try:
+                    if response.status in {301, 302, 303, 307, 308}:
+                        location = response.headers.get("Location")
+                        if hop == limits["redirects"] or not location:
+                            raise DiscoveryError("The feed redirected too many times.")
+                        url = http_url(urljoin(normalized, location))
+                        continue
+                    if response.status != 200:
+                        reason = "cloudflare" if response.status == 403 and "cloudflare" in response.headers.get("Server", "").lower() else str(response.status)
+                        raise DiscoveryError("The podcast server refused the request.", reason, 502)
+                    encoding = response.headers.get("Content-Encoding", "identity").strip().lower()
+                    if encoding not in {"identity", "gzip"}:
+                        raise DiscoveryError("The feed uses unsupported compression.")
+                    length = response.headers.get("Content-Length")
+                    try:
+                        if length and int(length) > limits["wire_bytes"]:
+                            raise DiscoveryError("The feed response is too large.")
+                    except ValueError as error:
+                        raise DiscoveryError("The feed response is invalid.", "invalid") from error
+                    decoder = zlib.decompressobj(16 + zlib.MAX_WBITS) if encoding == "gzip" else None
+                    body = bytearray()
+                    wire = 0
+                    while True:
+                        chunk = response.read(16 * 1024, decode_content=False)
+                        if not chunk:
+                            break
+                        wire += len(chunk)
+                        if wire > limits["wire_bytes"]:
+                            raise DiscoveryError("The feed response is too large.")
+                        remaining = limits["body_bytes"] - len(body)
+                        decoded = decoder.decompress(chunk, remaining + 1) if decoder else chunk
+                        if len(decoded) > remaining or (decoder and decoder.unconsumed_tail):
+                            raise DiscoveryError("The expanded feed is too large.")
+                        body.extend(decoded)
+                        if decoder and decoder.unused_data:
+                            raise DiscoveryError("Concatenated or trailing compressed data is not supported.")
+                    if decoder and not decoder.eof:
+                        raise DiscoveryError("The compressed feed is incomplete.", "invalid")
+                    return bytes(body), response.headers.get("Content-Type", ""), normalized
+                finally:
+                    response.close()
+        except (urllib3.exceptions.HTTPError, OSError) as error:
+            raise DiscoveryError("The podcast server could not be reached.", "unavailable", 502) from error
     raise DiscoveryError("No feed response was received.", "invalid")
 
 

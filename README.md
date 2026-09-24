@@ -85,6 +85,11 @@ Initial imports remain synchronous. Recast fetches and parses an unknown source
 once in a disposable subprocess, then imports the validated entries atomically.
 The subprocess has no Django settings or deployment environment. It verifies TLS,
 does not use environment proxy credentials, and cannot access the database.
+Every request resolves and validates all DNS answers, connects to a validated
+numeric public address, and preserves the hostname for HTTP Host, HTTPS SNI, and
+certificate validation. Private, loopback, link-local, reserved, multicast,
+shared, mixed public/private, and IPv6 transition destinations are rejected.
+Redirect destinations are checked the same way before a connection is made.
 Initial imports never follow feed pagination or invoke `read_feed`; scheduled
 `refreshfeeds` behavior is unchanged and is outside these initial-import limits.
 
@@ -136,9 +141,10 @@ No background queue or additional infrastructure is introduced. Roll back the
 application before reversing `0004`; otherwise discovery fails closed when the
 quota table/seed is absent.
 
-### Isolated local validation
+### Isolated checks
 
-Use Python 3.12 and a worktree-local environment:
+Use Python 3.12 and a worktree-local environment, with mysqlclient build
+prerequisites available:
 
 ```sh
 python3.12 -m venv .venv
@@ -149,5 +155,5 @@ python3.12 -m venv .venv
 
 The test settings provide an ephemeral secret, SQLite database, local memory cache
 and temporary static/media paths. They never load `server_settings.py` or production
-credentials. Discovery network tests mock requests; subprocess deadline tests use
+credentials. Discovery network tests mock DNS and HTTP boundaries; subprocess deadline tests use
 an inert local sleeping process. No feed or Cloudflare service is required.

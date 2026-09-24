@@ -77,11 +77,11 @@ def run_worker(url, limits):
                "agent": f"{settings.FEEDS_USER_AGENT} (+{settings.FEEDS_SERVER}; Initial Feed Crawler)"}
     try:
         result = subprocess.run(
-            [sys.executable, str(Path(__file__).with_name("discovery_worker.py"))],
+            [sys.executable, "-m", "rc.discovery_worker"],
             input=json.dumps(payload), text=True, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL, timeout=limits["seconds"], check=True,
             # The worker needs no deployment environment, Django or credentials.
-            env={"PATH": os.defpath},
+            env={"PATH": os.defpath}, cwd=Path(__file__).resolve().parent.parent,
         )
     except subprocess.TimeoutExpired as error:
         raise DiscoveryError("The feed took too long to read.", "timeout", 422) from error

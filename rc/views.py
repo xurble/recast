@@ -25,9 +25,6 @@ import CloudFlare
 import datetime
 import uuid
 import email
-import json
-
-
 from .models import Subscription
 
 
@@ -92,16 +89,17 @@ def feed(request, key):
     final_post = []
 
     if not sub.complete:
-        # Check that we shouldn't be adding the next episode
-
-        # hmm this will catch us up to the original schedule even for very slow pollers
-        # would it be better to just send one episode new max ?
-        # doesn't affect me personally as Overcast has a hyper-agressive server side poller :)
-        roll_date = sub.last_sent_date + datetime.timedelta(days=sub.frequency)
-        while sub.last_sent < sub.source.max_index and roll_date < right_now:
-            sub.last_sent_date = roll_date
-            sub.last_sent = sub.last_sent + 1
-            roll_date = roll_date + datetime.timedelta(days=sub.frequency)
+        # Bound legacy state saved before POST validation was introduced.
+        max_index = sub.source.max_index
+        sub.last_sent = max(min(1, max_index), min(sub.last_sent, max_index))
+        sub.frequency = max(1, min(sub.frequency, 14))
+        interval = datetime.timedelta(days=sub.frequency)
+        elapsed = right_now - sub.last_sent_date
+        # A release is due strictly after its scheduled time, as before.
+        due = max(0, (elapsed - datetime.timedelta(microseconds=1)) // interval)
+        advance = min(due, max_index - sub.last_sent)
+        sub.last_sent += advance
+        sub.last_sent_date += advance * interval
 
         if sub.last_sent == sub.source.max_index:
             sub.complete = True
@@ -209,17 +207,25 @@ def editfeed(request, key):
     request.vals["days"] = list(range(1, 15))
 
     if request.method == "POST":
-        if "release" in request.POST:
-            idx = int(request.POST["episode"])
+        field = "episode" if "release" in request.POST else "frequency"
+        maximum = s.max_index if field == "episode" else 14
+        try:
+            value = int(request.POST.get(field, ""))
+        except (TypeError, ValueError):
+            return HttpResponse("Invalid subscription setting.", status=400)
+        if not 1 <= value <= maximum:
+            return HttpResponse("Invalid subscription setting.", status=400)
+
+        if field == "episode":
+            idx = value
             if idx == sub.last_sent:  # This is the release next button
                 idx += 1
 
-            if idx <= sub.source.max_index:
+            if idx <= maximum:
                 sub.last_sent = idx
-                sub.last_sent_date = datetime.datetime.utcnow()
-
+                sub.last_sent_date = timezone.now()
         else:
-            sub.frequency = int(request.POST["frequency"])
+            sub.frequency = value
 
         sub.save()
 
@@ -362,9 +368,6 @@ def subscribe(request, sid):
         sub.last_sent_date = datetime.datetime.utcnow()
         sub.save()
 
-        s.num_subs = s.subscription_set.count()
-        s.save()
-
         messages.success(
             request,
             "Your new Recast feed has been created - subscribe to the link below in your Podcast App.",
@@ -378,6 +381,6 @@ def reader(request):
 
     response["Content-Type"] = "text/plain"
 
-    update_feeds(response)
+    update_feeds(max_feeds=3, output=response)
 
     return response
