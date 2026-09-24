@@ -18,11 +18,17 @@ class Migration(migrations.Migration):
             name='DiscoveryQuota',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('window_started', models.DateTimeField(null=True)),
-                ('attempts', models.PositiveIntegerField(default=0)),
                 ('sources_created', models.PositiveIntegerField(default=0)),
                 ('lease_token', models.CharField(blank=True, default='', max_length=32)),
                 ('lease_until', models.DateTimeField(null=True)),
+            ],
+        ),
+        migrations.CreateModel(
+            name='DiscoveryAttempt',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('created', models.DateTimeField(db_index=True)),
+                ('quota', models.ForeignKey(on_delete=models.CASCADE, related_name='discovery_attempts', to='rc.discoveryquota')),
             ],
         ),
         migrations.RunPython(seed_quota, migrations.RunPython.noop),

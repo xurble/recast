@@ -84,7 +84,7 @@ treat XML with at least one parsed entry or JSON Feed content with at least one
 item as a direct feed. It shall derive the source title and homepage from feed
 metadata when available.
 
-Evidence: `rc.views.addfeed`; `feedparser`; JSON parsing in `rc/views.py`.
+Evidence: `rc.views.addfeed`; `rc.discovery`; `rc.discovery_worker`; `feedparser`.
 
 **FR-005 — Discover feeds from web pages.** If a successful response is not a
 direct feed, Recast shall inspect HTML `link` elements for RSS or Atom alternate

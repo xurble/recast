@@ -105,7 +105,7 @@ The default `RECAST_DISCOVERY_LIMITS` can be overridden by a dictionary in
 | `attachments` | 2000 | Maximum enclosure/media declarations across the feed |
 | `redirects` | 3 | HTTP redirect hops; redirect bodies are not downloaded |
 | `seconds` | 15 | Wall-clock subprocess deadline, including startup, DNS, headers, body, parsing and result serialization |
-| `attempts_per_hour` | 30 | Global unknown-source discovery attempts per window |
+| `attempts_per_hour` | 30 | Global unknown-source discovery attempts in any rolling hour |
 | `sources` | 10000 | Lifetime successful public source creations after this migration |
 
 Values must be positive integers. Identity and single-member gzip responses are
@@ -119,11 +119,12 @@ scheduled refreshes.
 Run `manage.py migrate` before enabling the new code. Migration `0004` creates
 and seeds one `DiscoveryQuota` row; it does not modify existing feeds. Quotas use
 database write locking, not process-local cache or client IPs. Only one discovery
-may run at once across workers. A window begins with its first attempt and resets
-one hour later. Errors and HTML-only discoveries consume an attempt. Returning an
-existing source needs no worker or quota slot. Successful imports increment the
-lifetime counter, which does not decrease when sources are deleted. Reaching that
-cap requires an operator to raise `sources`; it never silently resets.
+may run at once across workers. Admissions older than one hour are discarded, so
+the limit applies continuously rather than at fixed boundaries. Errors and
+HTML-only discoveries consume an attempt. Returning an existing source needs no
+worker or quota slot. Successful imports increment the lifetime counter, which
+does not decrease when sources are deleted. Reaching that cap requires an
+operator to raise `sources`; it never silently resets.
 
 A lease expires after the worker deadline plus 30 seconds, recovering a crashed
 request without allowing a stale worker to commit or release a newer lease. The

@@ -16,7 +16,7 @@ from django.utils import timezone
 from feeds.models import Enclosure, Post, Source
 
 from . import discovery, discovery_worker as worker
-from .models import DiscoveryQuota
+from .models import DiscoveryAttempt, DiscoveryQuota
 
 URL = "https://podcast.example/feed"
 RSS = b'''<?xml version="1.0"?><rss version="2.0"><channel><title>Podcast</title>
@@ -151,12 +151,36 @@ class FetchTests(SimpleTestCase):
 class ParseTests(SimpleTestCase):
     def test_rss_atom_and_json_preserve_content_and_enclosures(self):
         for body, content_type in [(RSS, "application/rss+xml"), (ATOM, "application/atom+xml"), (JSON_FEED, "application/feed+json")]:
-            with self.subTest(content_type=content_type), patch.object(worker.requests.Session, "get", side_effect=AssertionError("unexpected refetch")):
+            with self.subTest(content_type=content_type):
                 result = worker.parse(body, content_type, URL, discovery.DEFAULT_LIMITS)
                 self.assertEqual(result["kind"], "feed")
                 self.assertEqual(len(result["posts"]), 1)
                 self.assertTrue(result["posts"][0]["body"])
                 self.assertEqual(len(result["posts"][0]["enclosures"]), 1)
+
+    def test_feed_body_signature_wins_over_mislabeled_html_header(self):
+        for body in [RSS, JSON_FEED]:
+            with self.subTest(body=body[:20]):
+                result = worker.parse(body, "text/html", URL, discovery.DEFAULT_LIMITS)
+                self.assertEqual(result["kind"], "feed")
+                self.assertEqual(len(result["posts"]), 1)
+
+    def test_discover_fetches_paginated_atom_once(self):
+        payload = {"url": URL, "limits": discovery.DEFAULT_LIMITS, "agent": "test"}
+        with patch.object(worker, "fetch", return_value=(ATOM, "application/atom+xml", URL)) as fetch:
+            result = worker.discover(payload)
+        self.assertEqual(result["kind"], "feed")
+        fetch.assert_called_once_with(URL, discovery.DEFAULT_LIMITS, "test")
+
+    def test_malformed_xml_and_json_are_rejected(self):
+        malformed = [
+            (b"<rss><channel><item></channel></rss>", "application/rss+xml"),
+            (b'{"items": [}', "application/feed+json"),
+        ]
+        for body, content_type in malformed:
+            with self.subTest(content_type=content_type), self.assertRaises(worker.DiscoveryError) as error:
+                worker.parse(body, content_type, URL, discovery.DEFAULT_LIMITS)
+            self.assertEqual(error.exception.reason, "invalid")
 
     def test_xml_entry_limit_precedes_feedparser(self):
         body = b"<rss><channel>" + b"<item><title>x</title></item>" * 3 + b"</channel></rss>"
@@ -223,8 +247,11 @@ class DeadlineTests(SimpleTestCase):
 
 class DiscoveryTests(TestCase):
     def setUp(self):
-        DiscoveryQuota.objects.update_or_create(pk=1, defaults={"attempts": 0, "sources_created": 0,
-                                                               "lease_until": None, "lease_token": "", "window_started": None})
+        DiscoveryQuota.objects.update_or_create(
+            pk=1,
+            defaults={"sources_created": 0, "lease_until": None, "lease_token": ""},
+        )
+        DiscoveryAttempt.objects.all().delete()
         self.worker = patch.object(discovery, "run_worker", return_value=parsed()).start()
         self.addCleanup(patch.stopall)
 
@@ -243,7 +270,8 @@ class DiscoveryTests(TestCase):
         self.assertEqual(post.enclosures.get().length, 42)
         self.assertGreater(source.due_poll, timezone.now())
         quota = DiscoveryQuota.objects.get(pk=1)
-        self.assertEqual((quota.attempts, quota.sources_created, quota.lease_token), (1, 1, ""))
+        self.assertEqual((quota.sources_created, quota.lease_token), (1, ""))
+        self.assertEqual(DiscoveryAttempt.objects.count(), 1)
         self.assertEqual(self.submit().json(), response.json())
         self.worker.assert_called_once()
 
@@ -256,7 +284,7 @@ class DiscoveryTests(TestCase):
                 self.assertFalse(Post.objects.exists())
                 self.assertFalse(Enclosure.objects.exists())
                 self.assertEqual(DiscoveryQuota.objects.get(pk=1).lease_token, "")
-        self.assertEqual(DiscoveryQuota.objects.get(pk=1).attempts, 3)
+        self.assertEqual(DiscoveryAttempt.objects.count(), 3)
 
     def test_database_failure_rolls_back_source_posts_and_lifetime_count(self):
         with patch.object(Enclosure.objects, "bulk_create", side_effect=DatabaseError("failed")):
@@ -264,7 +292,7 @@ class DiscoveryTests(TestCase):
         self.assertFalse(Source.objects.exists())
         self.assertFalse(Post.objects.exists())
         self.assertEqual(DiscoveryQuota.objects.get(pk=1).sources_created, 0)
-        self.assertEqual(DiscoveryQuota.objects.get(pk=1).attempts, 1)
+        self.assertEqual(DiscoveryAttempt.objects.count(), 1)
 
     @override_settings(RECAST_DISCOVERY_LIMITS={"attempts_per_hour": 1})
     def test_repeated_unique_sources_are_rejected_before_remote_work(self):
@@ -287,11 +315,32 @@ class DiscoveryTests(TestCase):
         self.assertEqual(self.submit().json()["reason"], "busy")
         self.worker.assert_not_called()
 
-    def test_expired_window_and_crashed_slot_recover(self):
-        DiscoveryQuota.objects.filter(pk=1).update(window_started=timezone.now() - timedelta(hours=2), attempts=30,
-                                                  lease_token="dead", lease_until=timezone.now() - timedelta(seconds=1))
+    def test_expired_attempts_and_crashed_slot_recover(self):
+        quota = DiscoveryQuota.objects.get(pk=1)
+        DiscoveryAttempt.objects.bulk_create([
+            DiscoveryAttempt(quota=quota, created=timezone.now() - timedelta(hours=2))
+            for _ in range(30)
+        ])
+        DiscoveryQuota.objects.filter(pk=1).update(
+            lease_token="dead", lease_until=timezone.now() - timedelta(seconds=1)
+        )
         self.assertTrue(self.submit().json()["ok"])
-        self.assertEqual(DiscoveryQuota.objects.get(pk=1).attempts, 1)
+        self.assertEqual(DiscoveryAttempt.objects.count(), 1)
+
+    def test_attempt_limit_has_no_fixed_window_boundary_burst(self):
+        quota = DiscoveryQuota.objects.get(pk=1)
+        now = timezone.now()
+        DiscoveryAttempt.objects.bulk_create([
+            DiscoveryAttempt(quota=quota, created=now - timedelta(minutes=59, seconds=59))
+            for _ in range(29)
+        ] + [DiscoveryAttempt(quota=quota, created=now - timedelta(minutes=30))])
+        with patch.object(discovery.timezone, "now", return_value=now):
+            with self.assertRaises(worker.DiscoveryError) as error:
+                discovery.claim(discovery.DEFAULT_LIMITS)
+        self.assertEqual(error.exception.reason, "quota")
+        with patch.object(discovery.timezone, "now", return_value=now + timedelta(seconds=2)):
+            self.assertTrue(discovery.claim(discovery.DEFAULT_LIMITS))
+        self.assertEqual(DiscoveryAttempt.objects.count(), 2)
 
     def test_stale_worker_cannot_persist_or_release_replacement_lease(self):
         def replace(*args):
@@ -307,14 +356,14 @@ class DiscoveryTests(TestCase):
         response = self.submit()
         self.assertContains(response, "&lt;script&gt;")
         self.assertFalse(Source.objects.exists())
-        self.assertEqual(DiscoveryQuota.objects.get(pk=1).attempts, 1)
+        self.assertEqual(DiscoveryAttempt.objects.count(), 1)
 
     def test_invalid_url_is_cleanly_rejected_before_admission(self):
         for url in ["https://[broken/feed", "https://podcast.example:99999/feed", "ftp://podcast.example/feed"]:
             with self.subTest(url=url):
                 self.assertEqual(self.submit(url).status_code, 422)
         self.worker.assert_not_called()
-        self.assertEqual(DiscoveryQuota.objects.get(pk=1).attempts, 0)
+        self.assertEqual(DiscoveryAttempt.objects.count(), 0)
 
     def test_missing_quota_fails_closed(self):
         DiscoveryQuota.objects.all().delete()
@@ -338,4 +387,4 @@ class ConcurrentQuotaTests(TransactionTestCase):
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(lambda _: contender(), range(2)))
         self.assertEqual(sum(result is not None for result in results), 1)
-        self.assertEqual(DiscoveryQuota.objects.get(pk=1).attempts, 1)
+        self.assertEqual(DiscoveryAttempt.objects.count(), 1)

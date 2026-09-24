@@ -156,12 +156,22 @@ def check_xml(body, limits):
     parser.StartElementHandler = start
     parser.EntityDeclHandler = entity
     parser.ExternalEntityRefHandler = entity
-    parser.Parse(body, True)
+    try:
+        parser.Parse(body, True)
+    except expat.ExpatError as error:
+        raise DiscoveryError("The XML feed is malformed.", "invalid") from error
 
 
 def parse(body, content_type, url, limits):
     body = body.lstrip()
-    if "html" in content_type.lower() or body[:15].lower().startswith((b"<!doctype html", b"<html")):
+    content_type = content_type.lower()
+    prefix = body[:256].lower()
+    is_json = body.startswith(b"{") or "json" in content_type
+    is_xml_feed = prefix.startswith((b"<?xml", b"<rss", b"<feed"))
+    is_html = prefix.startswith((b"<!doctype html", b"<html")) or (
+        "html" in content_type and not is_json and not is_xml_feed
+    )
+    if is_html:
         soup = BeautifulSoup(body, "html.parser")
         links = []
         for link in soup.find_all("link", href=True):
@@ -170,9 +180,11 @@ def parse(body, content_type, url, limits):
                 if len(links) > 20:
                     raise DiscoveryError("The page advertises too many feeds.")
         return {"kind": "links", "links": links}
-    is_json = "json" in content_type or body.startswith(b"{")
     if is_json:
-        data = json.loads(body)
+        try:
+            data = json.loads(body)
+        except (TypeError, ValueError) as error:
+            raise DiscoveryError("The JSON feed is malformed.", "invalid") from error
         entries = data.get("items", [])
         if not isinstance(entries, list) or data.get("expired"):
             raise DiscoveryError("The JSON feed is invalid or expired.", "invalid")

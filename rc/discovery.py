@@ -15,7 +15,7 @@ from django.utils import timezone
 from feeds.models import Enclosure, Post, Source
 
 from .discovery_worker import DiscoveryError, http_url
-from .models import DiscoveryQuota
+from .models import DiscoveryAttempt, DiscoveryQuota
 
 DEFAULT_LIMITS = {
     "wire_bytes": 2 * 1024 * 1024,
@@ -47,7 +47,7 @@ def existing_source(url):
 def locked_quota():
     # UPDATE is the first statement in the transaction. It takes a database write
     # lock on SQLite too, where select_for_update alone would be ineffective.
-    if not DiscoveryQuota.objects.filter(pk=1).update(attempts=F("attempts") + 0):
+    if not DiscoveryQuota.objects.filter(pk=1).update(sources_created=F("sources_created") + 0):
         raise DiscoveryError("Feed discovery is unavailable until migrations are applied.", "unavailable", 503)
     return DiscoveryQuota.objects.get(pk=1)
 
@@ -60,15 +60,14 @@ def claim(limits):
             raise DiscoveryError("Another feed is being checked. Please try again shortly.", "busy", 429)
         if quota.sources_created >= limits["sources"]:
             raise DiscoveryError("Public feed imports have reached capacity.", "capacity", 429)
-        if not quota.window_started or now >= quota.window_started + timedelta(hours=1):
-            quota.window_started = now
-            quota.attempts = 0
-        if quota.attempts >= limits["attempts_per_hour"]:
+        cutoff = now - timedelta(hours=1)
+        DiscoveryAttempt.objects.filter(quota=quota, created__lte=cutoff).delete()
+        if DiscoveryAttempt.objects.filter(quota=quota).count() >= limits["attempts_per_hour"]:
             raise DiscoveryError("Too many new feeds have been submitted. Please try again later.", "quota", 429)
-        quota.attempts += 1
+        DiscoveryAttempt.objects.create(quota=quota, created=now)
         quota.lease_token = uuid.uuid4().hex
         quota.lease_until = now + timedelta(seconds=limits["seconds"] + 30)
-        quota.save()
+        quota.save(update_fields=["lease_token", "lease_until"])
         return quota.lease_token
 
 
