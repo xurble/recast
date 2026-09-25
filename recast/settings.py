@@ -182,3 +182,6 @@ LOGGING = {
         },
     },
 }
+
+# Overrides for the bounded public initial-import policy.
+RECAST_DISCOVERY_LIMITS = getattr(server_settings, "RECAST_DISCOVERY_LIMITS", {})
