@@ -35,6 +35,14 @@ JSON_FEED = json.dumps({"version": "https://jsonfeed.org/version/1.1", "title": 
                            {"id": "json-one", "title": "JSON entry", "content_html": "<p>JSON body</p>",
                             "author": {"name": "Author"}, "date_published": "2026-08-30T12:00:00Z",
                             "attachments": [{"url": "https://podcast.example/json.mp3", "mime_type": "audio/mpeg"}]}]}).encode()
+RSS_ONE = b'''<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+xmlns="http://purl.org/rss/1.0/"><channel rdf:about="https://podcast.example/feed">
+<title>RSS One</title><link>https://podcast.example</link><description>Show</description></channel>
+<item rdf:about="https://podcast.example/one"><title>Episode</title>
+<link>https://podcast.example/one</link></item></rdf:RDF>'''
+PREFIXED_ATOM = b'''<atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:title>Atom</atom:title>
+<atom:entry><atom:id>one</atom:id><atom:title>Episode</atom:title>
+<atom:updated>2026-08-30T12:00:00Z</atom:updated></atom:entry></atom:feed>'''
 
 
 def parsed():
@@ -161,6 +169,20 @@ class ParseTests(SimpleTestCase):
     def test_feed_body_signature_wins_over_mislabeled_html_header(self):
         for body in [RSS, JSON_FEED]:
             with self.subTest(body=body[:20]):
+                result = worker.parse(body, "text/html", URL, discovery.DEFAULT_LIMITS)
+                self.assertEqual(result["kind"], "feed")
+                self.assertEqual(len(result["posts"]), 1)
+
+    def test_xml_root_detection_handles_valid_prefix_variants(self):
+        rss_without_declaration = RSS.split(b"?>", 1)[1]
+        variants = [
+            b"\xef\xbb\xbf" + RSS,
+            b"<!-- publisher comment -->" + rss_without_declaration,
+            RSS_ONE,
+            PREFIXED_ATOM,
+        ]
+        for body in variants:
+            with self.subTest(body=body[:40]):
                 result = worker.parse(body, "text/html", URL, discovery.DEFAULT_LIMITS)
                 self.assertEqual(result["kind"], "feed")
                 self.assertEqual(len(result["posts"]), 1)

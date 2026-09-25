@@ -28,6 +28,10 @@ class DiscoveryError(Exception):
         self.status = status
 
 
+class RootFound(Exception):
+    """Stop the classification parser after the document root is known."""
+
+
 def http_url(value):
     if not isinstance(value, str) or len(value) > 512:
         raise DiscoveryError("The feed URL is invalid.", "invalid")
@@ -162,13 +166,38 @@ def check_xml(body, limits):
         raise DiscoveryError("The XML feed is malformed.", "invalid") from error
 
 
+def xml_root_name(body):
+    """Return the namespace-independent XML root without parsing the document tree."""
+    parser = expat.ParserCreate(namespace_separator="}")
+    root = None
+
+    def start(name, attrs):
+        nonlocal root
+        root = name.rsplit("}", 1)[-1].lower()
+        raise RootFound()
+
+    def entity(*args):
+        raise DiscoveryError("XML entities are not supported.")
+
+    parser.StartElementHandler = start
+    parser.EntityDeclHandler = entity
+    parser.ExternalEntityRefHandler = entity
+    try:
+        parser.Parse(body, True)
+    except RootFound:
+        return root
+    except expat.ExpatError:
+        return None
+    return None
+
+
 def parse(body, content_type, url, limits):
     body = body.lstrip()
     content_type = content_type.lower()
-    prefix = body[:256].lower()
     is_json = body.startswith(b"{") or "json" in content_type
-    is_xml_feed = prefix.startswith((b"<?xml", b"<rss", b"<feed"))
-    is_html = prefix.startswith((b"<!doctype html", b"<html")) or (
+    root = None if is_json else xml_root_name(body)
+    is_xml_feed = root in {"rss", "feed", "rdf"}
+    is_html = root == "html" or (
         "html" in content_type and not is_json and not is_xml_feed
     )
     if is_html:
