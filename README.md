@@ -116,6 +116,10 @@ while accommodating typical podcast feeds; operators can raise them deliberately
 for larger archives. They do not impose a total cap on existing sources or future
 scheduled refreshes.
 
+Relative links in JSON Feed entry HTML are resolved against the item URL, then
+the feed homepage, and finally the fetched feed URL when earlier bases are absent
+or invalid.
+
 Run `manage.py migrate` before enabling the new code. Migration `0004` creates
 and seeds one `DiscoveryQuota` row; it does not modify existing feeds. Quotas use
 database write locking, not process-local cache or client IPs. Only one discovery

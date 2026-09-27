@@ -123,6 +123,27 @@ def clean_html(value):
     return _sanitize_html(text(value), "utf-8", "text/html")
 
 
+def content_base(*candidates):
+    """Choose the first usable HTTP(S) base for relative entry content links."""
+    for candidate in candidates:
+        try:
+            return http_url(candidate)
+        except DiscoveryError:
+            pass
+    return ""
+
+
+def clean_html_with_absolute_links(value, base):
+    """Sanitize entry HTML, then resolve surviving href/src values."""
+    soup = BeautifulSoup(clean_html(value), "html.parser")
+    if base:
+        for element in soup.find_all(href=True):
+            element["href"] = urljoin(base, element["href"])
+        for element in soup.find_all(src=True):
+            element["src"] = urljoin(base, element["src"])
+    return str(soup)
+
+
 def date_value(value):
     try:
         if isinstance(value, (tuple, list)):
@@ -238,9 +259,15 @@ def parse(body, content_type, url, limits):
     seen = set()
     for item in reversed(entries):
         if is_json:
-            body_text = clean_html(item.get("content_html")) if "content_html" in item else clean_html(item.get("content_text"))
-            title = clean_html(item.get("title"))
             link = text(item.get("url"), 512)
+            # JSON Feed content resolves against the item URL. Publisher home
+            # page and fetched feed URL are stable fallbacks for missing/bad URLs.
+            base = content_base(link, data.get("home_page_url"), url)
+            body_text = clean_html_with_absolute_links(
+                item.get("content_html") if "content_html" in item else item.get("content_text"),
+                base,
+            )
+            title = clean_html(item.get("title"))
             guid = item.get("id")
             created = date_value(item.get("date_published"))
             author = item.get("author", {})

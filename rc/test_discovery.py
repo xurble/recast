@@ -240,6 +240,29 @@ class ParseTests(SimpleTestCase):
         result = worker.parse(json.dumps(data).encode(), "application/json", URL, discovery.DEFAULT_LIMITS)
         self.assertNotIn("<script", result["posts"][0]["body"])
 
+    def test_json_content_links_use_item_url_and_documented_fallbacks(self):
+        cases = [
+            ("https://podcast.example/episodes/one", "https://podcast.example/show/",
+             "https://podcast.example/episodes/art.jpg"),
+            (None, "https://podcast.example/show/", "https://podcast.example/show/art.jpg"),
+            (None, None, "https://podcast.example/art.jpg"),
+        ]
+        for item_url, home_page_url, expected_src in cases:
+            data = json.loads(JSON_FEED)
+            data["home_page_url"] = home_page_url
+            data["items"][0]["url"] = item_url
+            data["items"][0]["content_html"] = (
+                '<a href="/notes"><img src="art.jpg"></a>'
+            )
+            with self.subTest(item_url=item_url, home_page_url=home_page_url):
+                result = worker.parse(
+                    json.dumps(data).encode(), "application/feed+json", URL,
+                    discovery.DEFAULT_LIMITS,
+                )
+                body = result["posts"][0]["body"]
+                self.assertIn('href="https://podcast.example/notes"', body)
+                self.assertIn(f'src="{expected_src}"', body)
+
     def test_empty_feed_is_rejected(self):
         with self.assertRaises(worker.DiscoveryError):
             worker.parse(b"<rss><channel/></rss>", "application/rss+xml", URL, discovery.DEFAULT_LIMITS)
