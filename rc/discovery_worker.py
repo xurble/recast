@@ -33,9 +33,16 @@ class RootFound(Exception):
 
 
 HTML_URL_ATTRIBUTES = {
-    "action", "background", "cite", "data", "dynsrc", "formaction", "href",
-    "icon", "longdesc", "lowsrc", "ping", "poster", "src", "usemap", "xlink:href",
+    "action", "archive", "background", "cite", "code", "codebase", "data",
+    "datasrc", "dynsrc", "formaction", "href", "icon", "longdesc", "lowsrc",
+    "manifest", "ping", "poster", "profile", "src", "srcset", "urn", "usemap",
+    "vrml", "xlink:href",
 }
+
+# Feedparser's sanitizer retains SVG, MathML, and SMIL. Their URL-bearing and
+# animation attributes are too broad and context-dependent to validate safely as
+# ordinary HTML, so imported feed markup does not retain those namespaces.
+UNSUPPORTED_EMBEDDED_MARKUP = {"math", "svg"}
 
 
 def http_url(value):
@@ -155,8 +162,10 @@ def content_base(*candidates):
 
 
 def clean_html_with_absolute_links(value, base):
-    """Sanitize entry HTML, then validate and resolve surviving URL attributes."""
+    """Sanitize imported HTML, then validate and resolve surviving URL attributes."""
     soup = BeautifulSoup(clean_html(value), "html.parser")
+    for element in soup.find_all(UNSUPPORTED_EMBEDDED_MARKUP):
+        element.decompose()
     for element in soup.find_all(True):
         for attribute in tuple(element.attrs):
             if attribute.lower() not in HTML_URL_ATTRIBUTES:
@@ -266,16 +275,28 @@ def parse(body, content_type, url, limits):
         feed_home = safe_http_url(data.get("home_page_url"), url, 255)
         meta = {"name": clean_html(data.get("title"))[:255],
                 "site_url": text(feed_home, 255),
-                "description": clean_html(data.get("description")),
+                "description": clean_html_with_absolute_links(
+                    data.get("description"), feed_home or url
+                ),
                 "image_url": safe_http_url(data.get("icon"), feed_home or url)}
     else:
         check_xml(body, limits)
-        data = feedparser.parse(body, response_headers={"content-location": url})
+        # Resolve every retained URL below under the same HTTP(S)-only policy.
+        # Letting feedparser resolve markup first would hide the original base
+        # relationship and make feed descriptions differ from entry content.
+        data = feedparser.parse(
+            body,
+            response_headers={"content-location": url},
+            resolve_relative_uris=False,
+        )
         entries = data.entries
         feed_home = safe_http_url(data.feed.get("link"), url, 255)
         meta = {"name": text(data.feed.get("title"), 255),
                 "site_url": feed_home,
-                "description": text(data.feed.get("description") or data.feed.get("subtitle")),
+                "description": clean_html_with_absolute_links(
+                    data.feed.get("description") or data.feed.get("subtitle"),
+                    feed_home or url,
+                ),
                 "image_url": safe_http_url(data.feed.get("image", {}).get("href"), feed_home or url)}
     if not entries:
         raise DiscoveryError("The feed contains no entries.", "invalid")
@@ -289,7 +310,7 @@ def parse(body, content_type, url, limits):
             link = safe_http_url(item.get("url"), feed_home or url)
             # JSON Feed content resolves against the item URL. Publisher home
             # page and fetched feed URL are stable fallbacks for missing/bad URLs.
-            base = content_base(link, data.get("home_page_url"), url)
+            base = content_base(link, feed_home, url)
             body_text = clean_html_with_absolute_links(
                 item.get("content_html") if "content_html" in item else item.get("content_text"),
                 base,

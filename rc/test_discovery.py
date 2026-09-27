@@ -244,7 +244,7 @@ class ParseTests(SimpleTestCase):
         cases = [
             ("https://podcast.example/episodes/one", "https://podcast.example/show/",
              "https://podcast.example/episodes/art.jpg"),
-            (None, "https://podcast.example/show/", "https://podcast.example/show/art.jpg"),
+            (None, "/show/", "https://podcast.example/show/art.jpg"),
             (None, None, "https://podcast.example/art.jpg"),
         ]
         for item_url, home_page_url, expected_src in cases:
@@ -282,6 +282,67 @@ class ParseTests(SimpleTestCase):
         self.assertNotIn("data:", body)
         for attribute in ["href", "src", "xlink:href", "action", "poster", "ping"]:
             self.assertNotIn(attribute + "=", body)
+
+    def test_json_content_removes_embedded_markup_and_legacy_url_carriers(self):
+        data = json.loads(JSON_FEED)
+        data["items"][0]["content_html"] = '''
+            <div datasrc="javascript:alert(1)" urn="javascript:alert(2)"
+                 vrml="data:text/html,bad">legacy</div>
+            <math><mtext altimg="javascript:alert(3)">math</mtext></math>
+            <svg><rect fill="url(javascript:alert(4))"
+                 marker-start="url(data:text/html,bad)"></rect>
+                 <set attributeName="xlink:href" to="javascript:alert(5)"></set>
+            </svg>
+        '''
+        result = worker.parse(
+            json.dumps(data).encode(), "application/feed+json", URL,
+            discovery.DEFAULT_LIMITS,
+        )
+        body = result["posts"][0]["body"]
+        self.assertIn("legacy", body)
+        self.assertNotIn("javascript:", body)
+        self.assertNotIn("data:", body)
+        self.assertNotIn("datasrc=", body)
+        self.assertNotIn("urn=", body)
+        self.assertNotIn("vrml=", body)
+        self.assertNotIn("<math", body)
+        self.assertNotIn("<svg", body)
+
+    def test_feed_descriptions_validate_urls_for_json_and_xml(self):
+        unsafe_markup = (
+            '<form action="javascript:alert(1)">bad</form>'
+            '<img src="data:text/html,bad">'
+            '<a href="about">about</a>'
+        )
+        data = json.loads(JSON_FEED)
+        data["home_page_url"] = "/show/"
+        data["description"] = unsafe_markup
+        json_result = worker.parse(
+            json.dumps(data).encode(), "application/feed+json", URL,
+            discovery.DEFAULT_LIMITS,
+        )
+        json_description = json_result["source"]["description"]
+        self.assertNotIn("javascript:", json_description)
+        self.assertNotIn("data:", json_description)
+        self.assertNotIn("action=", json_description)
+        self.assertNotIn("src=", json_description)
+        self.assertIn('href="https://podcast.example/show/about"', json_description)
+
+        xml_markup = unsafe_markup.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        body = f'''<rss><channel><title>Unsafe</title>
+            <link>https://podcast.example/show/</link>
+            <description>{xml_markup}</description>
+            <item><guid>one</guid><title>Episode</title></item>
+            </channel></rss>'''.encode()
+        xml_result = worker.parse(
+            body, "application/rss+xml", URL, discovery.DEFAULT_LIMITS
+        )
+        xml_description = xml_result["source"]["description"]
+        self.assertNotIn("javascript:", xml_description)
+        self.assertNotIn("data:", xml_description)
+        self.assertNotIn("action=", xml_description)
+        self.assertNotIn("src=", xml_description)
+        self.assertIn('href="https://podcast.example/show/about"', xml_description)
 
     def test_json_persisted_urls_require_http_and_resolve_relative_values(self):
         unsafe = json.loads(JSON_FEED)
