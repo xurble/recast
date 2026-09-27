@@ -118,7 +118,9 @@ scheduled refreshes.
 
 Relative links in JSON Feed entry HTML are resolved against the item URL, then
 the feed homepage, and finally the fetched feed URL when earlier bases are absent
-or invalid.
+or invalid. Only HTTP(S) URLs are retained from public feeds in entry HTML,
+source/item links, artwork, and attachments; unsafe schemes are removed before
+persistence.
 
 Run `manage.py migrate` before enabling the new code. Migration `0004` creates
 and seeds one `DiscoveryQuota` row; it does not modify existing feeds. Quotas use

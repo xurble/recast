@@ -32,6 +32,12 @@ class RootFound(Exception):
     """Stop the classification parser after the document root is known."""
 
 
+HTML_URL_ATTRIBUTES = {
+    "action", "background", "cite", "data", "dynsrc", "formaction", "href",
+    "icon", "longdesc", "lowsrc", "ping", "poster", "src", "usemap", "xlink:href",
+}
+
+
 def http_url(value):
     if not isinstance(value, str) or len(value) > 512:
         raise DiscoveryError("The feed URL is invalid.", "invalid")
@@ -123,24 +129,43 @@ def clean_html(value):
     return _sanitize_html(text(value), "utf-8", "text/html")
 
 
+def safe_http_url(value, base="", maximum=512):
+    """Return an absolute HTTP(S) URL or an empty string for unsafe input."""
+    if not isinstance(value, str):
+        return ""
+    value = value.strip()
+    if not value or "\\" in value or any(ord(char) <= 32 or ord(char) == 127 for char in value):
+        return ""
+    candidate = urljoin(base, value) if base else value
+    if len(candidate) > maximum:
+        return ""
+    try:
+        return http_url(candidate)
+    except DiscoveryError:
+        return ""
+
+
 def content_base(*candidates):
     """Choose the first usable HTTP(S) base for relative entry content links."""
     for candidate in candidates:
-        try:
-            return http_url(candidate)
-        except DiscoveryError:
-            pass
+        result = safe_http_url(candidate)
+        if result:
+            return result
     return ""
 
 
 def clean_html_with_absolute_links(value, base):
-    """Sanitize entry HTML, then resolve surviving href/src values."""
+    """Sanitize entry HTML, then validate and resolve surviving URL attributes."""
     soup = BeautifulSoup(clean_html(value), "html.parser")
-    if base:
-        for element in soup.find_all(href=True):
-            element["href"] = urljoin(base, element["href"])
-        for element in soup.find_all(src=True):
-            element["src"] = urljoin(base, element["src"])
+    for element in soup.find_all(True):
+        for attribute in tuple(element.attrs):
+            if attribute.lower() not in HTML_URL_ATTRIBUTES:
+                continue
+            safe = safe_http_url(element.get(attribute), base)
+            if safe:
+                element[attribute] = safe
+            else:
+                del element[attribute]
     return str(soup)
 
 
@@ -154,8 +179,8 @@ def date_value(value):
         return datetime.now(timezone.utc).isoformat()
 
 
-def enclosure(value):
-    href = text(value.get("href") or value.get("url"), 512)
+def enclosure(value, base=""):
+    href = safe_http_url(value.get("href") or value.get("url"), base)
     try:
         length = max(0, min(int(value.get("length", value.get("size_in_bytes", value.get("filesize", 0)))), 2**31 - 1))
     except (ValueError, TypeError):
@@ -238,18 +263,20 @@ def parse(body, content_type, url, limits):
         entries = data.get("items", [])
         if not isinstance(entries, list) or data.get("expired"):
             raise DiscoveryError("The JSON feed is invalid or expired.", "invalid")
+        feed_home = safe_http_url(data.get("home_page_url"), url, 255)
         meta = {"name": clean_html(data.get("title"))[:255],
-                "site_url": text(data.get("home_page_url"), 255),
+                "site_url": text(feed_home, 255),
                 "description": clean_html(data.get("description")),
-                "image_url": text(data.get("icon"), 512)}
+                "image_url": safe_http_url(data.get("icon"), feed_home or url)}
     else:
         check_xml(body, limits)
         data = feedparser.parse(body, response_headers={"content-location": url})
         entries = data.entries
+        feed_home = safe_http_url(data.feed.get("link"), url, 255)
         meta = {"name": text(data.feed.get("title"), 255),
-                "site_url": text(data.feed.get("link"), 255),
+                "site_url": feed_home,
                 "description": text(data.feed.get("description") or data.feed.get("subtitle")),
-                "image_url": text(data.feed.get("image", {}).get("href"), 512)}
+                "image_url": safe_http_url(data.feed.get("image", {}).get("href"), feed_home or url)}
     if not entries:
         raise DiscoveryError("The feed contains no entries.", "invalid")
     if len(entries) > limits["entries"]:
@@ -259,7 +286,7 @@ def parse(body, content_type, url, limits):
     seen = set()
     for item in reversed(entries):
         if is_json:
-            link = text(item.get("url"), 512)
+            link = safe_http_url(item.get("url"), feed_home or url)
             # JSON Feed content resolves against the item URL. Publisher home
             # page and fetched feed URL are stable fallbacks for missing/bad URLs.
             base = content_base(link, data.get("home_page_url"), url)
@@ -273,18 +300,27 @@ def parse(body, content_type, url, limits):
             author = item.get("author", {})
             author = author.get("name", "") if isinstance(author, dict) else author
             attachments = item.get("attachments", [])
-            image = text(item.get("image") or item.get("banner_image"), 512)
+            image = safe_http_url(
+                item.get("image") or item.get("banner_image"),
+                link or feed_home or url,
+            )
+            attachment_base = link or feed_home or url
         else:
             bodies = [text(item.get("summary")), text(item.get("description"))]
             bodies += [text(c.get("value")) for c in item.get("content", []) if c.get("type") == "text/html"]
-            body_text = max(bodies, key=len)
             title = text(item.get("title"))
-            link = text(item.get("link"), 512)
+            link = safe_http_url(item.get("link"), feed_home or url)
+            body_text = clean_html_with_absolute_links(
+                max(bodies, key=len), content_base(link, feed_home, url)
+            )
             guid = item.get("id") or item.get("guid")
             created = date_value(item.get("published_parsed") or item.get("updated_parsed"))
             author = item.get("author")
             attachments = item.get("enclosures", []) + item.get("media_content", [])
-            image = text(item.get("image", {}).get("href"), 512)
+            image = safe_http_url(
+                item.get("image", {}).get("href"), link or feed_home or url
+            )
+            attachment_base = link or feed_home or url
         if not isinstance(attachments, list) or len(attachments) > limits["attachments_per_entry"]:
             raise DiscoveryError("An entry has too many attachments.")
         attachment_count += len(attachments)
@@ -294,7 +330,11 @@ def parse(body, content_type, url, limits):
         if guid in seen:
             continue
         seen.add(guid)
-        enclosures = {e["href"]: e for e in map(enclosure, attachments) if e["href"]}
+        enclosures = {
+            parsed["href"]: parsed
+            for parsed in (enclosure(value, attachment_base) for value in attachments)
+            if parsed["href"]
+        }
         posts.append({"title": title, "body": body_text, "link": link, "guid": guid,
                       "created": created, "author": text(author, 255), "image_url": image,
                       "enclosures": list(enclosures.values())})

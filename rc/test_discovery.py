@@ -263,6 +263,80 @@ class ParseTests(SimpleTestCase):
                 self.assertIn('href="https://podcast.example/notes"', body)
                 self.assertIn(f'src="{expected_src}"', body)
 
+    def test_json_content_removes_unsafe_url_schemes_from_all_attributes(self):
+        data = json.loads(JSON_FEED)
+        data["items"][0]["content_html"] = '''
+            <a href="javascript:alert(1)">link</a>
+            <img src="javascript:alert(2)">
+            <svg><use xlink:href="javascript:alert(3)"></use></svg>
+            <form action="javascript:alert(4)"></form>
+            <video poster="data:text/html,bad"></video>
+            <a ping="javascript:alert(5)">ping</a>
+        '''
+        result = worker.parse(
+            json.dumps(data).encode(), "application/feed+json", URL,
+            discovery.DEFAULT_LIMITS,
+        )
+        body = result["posts"][0]["body"]
+        self.assertNotIn("javascript:", body)
+        self.assertNotIn("data:", body)
+        for attribute in ["href", "src", "xlink:href", "action", "poster", "ping"]:
+            self.assertNotIn(attribute + "=", body)
+
+    def test_json_persisted_urls_require_http_and_resolve_relative_values(self):
+        unsafe = json.loads(JSON_FEED)
+        unsafe["home_page_url"] = "javascript:alert(1)"
+        unsafe["icon"] = "data:text/html,bad"
+        unsafe["items"][0].update({
+            "url": "javascript:alert(2)",
+            "image": "data:text/html,bad",
+            "attachments": [{"url": "javascript:alert(3)", "mime_type": "audio/mpeg"}],
+        })
+        result = worker.parse(
+            json.dumps(unsafe).encode(), "application/feed+json", URL,
+            discovery.DEFAULT_LIMITS,
+        )
+        self.assertEqual(result["source"]["site_url"], "")
+        self.assertEqual(result["source"]["image_url"], "")
+        self.assertEqual(result["posts"][0]["link"], "")
+        self.assertEqual(result["posts"][0]["image_url"], "")
+        self.assertEqual(result["posts"][0]["enclosures"], [])
+
+        relative = json.loads(JSON_FEED)
+        relative["home_page_url"] = "/show/"
+        relative["icon"] = "art/icon.jpg"
+        relative["items"][0].update({
+            "url": "episodes/one",
+            "image": "episode.jpg",
+            "attachments": [{"url": "audio.mp3", "mime_type": "audio/mpeg"}],
+        })
+        result = worker.parse(
+            json.dumps(relative).encode(), "application/feed+json", URL,
+            discovery.DEFAULT_LIMITS,
+        )
+        self.assertEqual(result["source"]["site_url"], "https://podcast.example/show/")
+        self.assertEqual(result["source"]["image_url"], "https://podcast.example/show/art/icon.jpg")
+        post = result["posts"][0]
+        self.assertEqual(post["link"], "https://podcast.example/show/episodes/one")
+        self.assertEqual(post["image_url"], "https://podcast.example/show/episodes/episode.jpg")
+        self.assertEqual(post["enclosures"][0]["href"], "https://podcast.example/show/episodes/audio.mp3")
+
+    def test_xml_persisted_and_content_urls_require_http(self):
+        body = b'''<rss><channel><title>Unsafe</title>
+            <link>javascript:alert(1)</link><image><url>data:text/html,bad</url></image>
+            <item><guid>one</guid><title>Episode</title>
+            <link>javascript:alert(2)</link>
+            <description>&lt;img src="javascript:alert(3)"&gt;</description>
+            <enclosure url="javascript:alert(4)" type="audio/mpeg"/>
+            </item></channel></rss>'''
+        result = worker.parse(body, "application/rss+xml", URL, discovery.DEFAULT_LIMITS)
+        self.assertEqual(result["source"]["site_url"], "")
+        self.assertEqual(result["source"]["image_url"], "")
+        post = result["posts"][0]
+        self.assertEqual(post["link"], "")
+        self.assertNotIn("javascript:", post["body"])
+        self.assertEqual(post["enclosures"], [])
+
     def test_empty_feed_is_rejected(self):
         with self.assertRaises(worker.DiscoveryError):
             worker.parse(b"<rss><channel/></rss>", "application/rss+xml", URL, discovery.DEFAULT_LIMITS)
