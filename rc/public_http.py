@@ -1,11 +1,7 @@
-"""HTTP requests whose connection address cannot change after validation."""
+"""Validation for public HTTP destinations before a pinned connection."""
 import ipaddress
 import socket
-from urllib.parse import urljoin, urlsplit, urlunsplit
-
-import requests
-import urllib3
-from requests.structures import CaseInsensitiveDict
+from urllib.parse import urlsplit, urlunsplit
 
 
 class UnsafeFeedURL(ValueError):
@@ -52,40 +48,3 @@ def resolve_public_url(url):
         authority += f":{port}"
     normalized = urlunsplit((parts.scheme, authority, parts.path or "/", parts.query, ""))
     return normalized, hostname, port, addresses[0], authority
-
-
-def public_get(url, headers=None, timeout=30):
-    """Fetch with pinned DNS, verified TLS, no proxies, and checked redirects."""
-    for hop in range(11):
-        url, hostname, port, address, authority = resolve_public_url(url)
-        parts = urlsplit(url)
-        target = requests.Request("GET", url).prepare().path_url
-        request_headers = dict(headers or {})
-        request_headers["Host"] = authority
-        pool_class = urllib3.HTTPConnectionPool
-        options = {}
-        if parts.scheme == "https":
-            pool_class = urllib3.HTTPSConnectionPool
-            options = {"cert_reqs": "CERT_REQUIRED", "ca_certs": requests.certs.where(),
-                       "assert_hostname": hostname, "server_hostname": hostname}
-        # Numeric pool host pins the connection; TLS and Host still use the
-        # original name. No environment proxy, netrc or second hostname lookup.
-        with pool_class(address, port=port, **options) as pool:
-            raw = pool.urlopen("GET", target, headers=request_headers,
-                               timeout=timeout, redirect=False, retries=False)
-            response = requests.Response()
-            response.status_code = raw.status
-            response.headers = CaseInsensitiveDict(raw.headers)
-            response._content = raw.data
-            response.encoding = requests.utils.get_encoding_from_headers(response.headers)
-            response.url = url
-        if response.status_code not in {301, 302, 303, 307, 308}:
-            return response
-        location = response.headers.get("Location")
-        if not location or hop == 10:
-            raise UnsafeFeedURL("Invalid redirect chain.")
-        # Do not let urljoin silently strip controls before validation.
-        if any(ord(c) <= 32 or ord(c) == 127 for c in location) or "\\" in location:
-            raise UnsafeFeedURL("Invalid redirect destination.")
-        url = urljoin(url, location)
-    raise UnsafeFeedURL("Invalid redirect chain.")

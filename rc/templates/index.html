@@ -101,7 +101,15 @@ function addFeed(fid)
                         });
                     }
     
-                },'html');
+                },'html').fail(function(xhr){
+                    var message = "Recast could not check this feed. Please try again later.";
+                    try {
+                        message = JSON.parse(xhr.responseText).msg || message;
+                    } catch (error) {}
+                    $("#working").fadeOut(function(){
+                        $("#addresult").text(message).fadeIn();
+                    });
+                });
     
             });
         });

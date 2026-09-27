@@ -110,3 +110,20 @@ class SubscriptionPost(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
     subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE)
     created = models.DateTimeField(auto_now_add=True)
+
+
+class DiscoveryQuota(models.Model):
+    """One durable row bounds anonymous discovery across all web workers."""
+
+    sources_created = models.PositiveIntegerField(default=0)
+    lease_token = models.CharField(max_length=32, blank=True, default="")
+    lease_until = models.DateTimeField(null=True)
+
+
+class DiscoveryAttempt(models.Model):
+    """A recent admission used to enforce the global rolling-hour budget."""
+
+    quota = models.ForeignKey(
+        DiscoveryQuota, on_delete=models.CASCADE, related_name="discovery_attempts"
+    )
+    created = models.DateTimeField(db_index=True)
