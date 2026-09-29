@@ -24,7 +24,7 @@ import CloudFlare
 
 import datetime
 import uuid
-import email
+import email.utils
 from .models import Subscription
 
 
@@ -118,8 +118,8 @@ def feed(request, key):
                         "title": "Recast is complete",
                         "recast_link": "/",
                         "author": "Recast",
-                        "created_for_subscription": email.Utils.formatdate(
-                            float(sub.last_sent_date.strftime("%s"))
+                        "created_for_subscription": email.utils.formatdate(
+                            sub.last_sent_date.timestamp()
                         ),
                         "body": "This Recast has come to an end.  If you have not already done so, you can get a link to the original source podcast feed from the settings link above.  You should subscribe to the original to continue listening to further episodes.  We hope you enjoyed using Recast.",
                         "id": "fin!",
