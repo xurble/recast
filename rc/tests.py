@@ -1,5 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
+from datetime import datetime, timedelta, timezone as datetime_timezone
+from email.utils import parsedate_to_datetime
+from xml.etree import ElementTree
 from io import StringIO
 from threading import Event, local
 from types import SimpleNamespace
@@ -614,3 +617,74 @@ class EditFeedCacheInvalidationTests(SimpleTestCase):
         self.assertEqual(self.subscription.last_sent, 5)
         self.subscription.save.assert_called_once_with()
         self.assert_feed_was_purged(cloudflare)
+
+
+class CompletionFeedTests(TestCase):
+    def setUp(self):
+        self.baseline = datetime(2026, 9, 1, 12, 30, tzinfo=datetime_timezone.utc)
+        source = Source.objects.create(
+            name="Completed podcast", feed_url="https://example.com/completed.xml",
+            max_index=1, due_poll=self.baseline,
+        )
+        self.subscription = Subscription.objects.create(
+            source=source, key="completed-podcast", name="Completed podcast",
+            complete=True, last_sent=1, last_sent_date=self.baseline,
+        )
+
+    def request_at(self, elapsed, **headers):
+        request = RequestFactory().get(
+            reverse("feed", args=[self.subscription.key]),
+            HTTP_HOST="testserver", **headers,
+        )
+        with patch("rc.views.timezone.now", return_value=self.baseline + elapsed):
+            response = feed(request, self.subscription.key)
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.last_return_code, response.status_code)
+        return response
+
+    def completion_items(self, response):
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/rss+xml")
+        root = ElementTree.fromstring(response.content)
+        self.assertEqual(root.tag, "rss")
+        return [item for item in root.findall("./channel/item")
+                if item.findtext("title") == "Recast is complete"]
+
+    def test_two_days_and_just_before_three_have_no_completion_item(self):
+        for elapsed in (timedelta(days=2), timedelta(days=3, microseconds=-1)):
+            with self.subTest(elapsed=elapsed):
+                self.assertEqual(self.completion_items(self.request_at(elapsed)), [])
+
+    def test_completion_item_renders_throughout_days_three_to_six(self):
+        for elapsed in [timedelta(days=day) for day in range(3, 7)] + [
+            timedelta(days=7, microseconds=-1)
+        ]:
+            with self.subTest(elapsed=elapsed):
+                items = self.completion_items(self.request_at(elapsed))
+                self.assertEqual(len(items), 1)
+                item = items[0]
+                date = parsedate_to_datetime(item.findtext("pubDate"))
+                self.assertEqual(date.replace(tzinfo=datetime_timezone.utc), self.baseline)
+                self.assertEqual(item.findtext("guid"), "completed-podcast/fin!")
+                self.assertEqual(item.find("enclosure").attrib, {
+                    "url": "https://testserver/static/audio/end.mp3",
+                    "length": "94875", "type": "audio/mpeg",
+                })
+
+    def test_seven_days_returns_gone_even_with_previous_etag(self):
+        response = self.request_at(
+            timedelta(days=7),
+            HTTP_IF_NONE_MATCH=f'"{self.subscription.pk}-2"',
+        )
+        self.assertEqual(response.status_code, 410)
+
+    def test_completion_supports_conditional_requests(self):
+        complete = self.request_at(
+            timedelta(days=3), HTTP_IF_NONE_MATCH=f'"{self.subscription.pk}-1"',
+        )
+        self.assertEqual(len(self.completion_items(complete)), 1)
+        cached = self.request_at(
+            timedelta(days=6), HTTP_IF_NONE_MATCH=f'"{self.subscription.pk}-2"',
+        )
+        self.assertEqual(cached.status_code, 304)
+        self.assertEqual(cached.content, b"")
