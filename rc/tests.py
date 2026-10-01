@@ -514,6 +514,42 @@ class HttpsSecurityTests(SimpleTestCase):
         self.assertTrue(response.cookies[settings.CSRF_COOKIE_NAME]["secure"])
 
 
+@override_settings(DEBUG=False)
+class FeedLookupFailureTests(TestCase):
+    def setUp(self):
+        self.url = reverse("feed", args=["missing-subscription-key"])
+
+    def test_missing_subscription_is_cached_as_gone(self):
+        response = self.client.get(self.url, secure=True)
+
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response["Cache-Control"], "max-age=604800")
+        self.assertIn("Expires", response)
+
+    def test_lookup_failures_return_server_errors_without_cache_freshness(self):
+        self.client.raise_request_exception = False
+        for error in (OperationalError("database unavailable"), RuntimeError("lookup failed")):
+            with self.subTest(error=type(error).__name__), patch(
+                "rc.views.Subscription.objects.get", side_effect=error
+            ):
+                response = self.client.get(self.url, secure=True)
+
+                self.assertEqual(response.status_code, 500)
+                self.assertNotIn("Cache-Control", response)
+                self.assertNotIn("Expires", response)
+                self.assertNotContains(response, str(error), status_code=500)
+
+    def test_lookup_failures_propagate_to_standard_error_handling(self):
+        request = RequestFactory().get(self.url, secure=True)
+        for error in (OperationalError("database unavailable"), RuntimeError("lookup failed")):
+            with self.subTest(error=type(error).__name__), patch(
+                "rc.views.Subscription.objects.get", side_effect=error
+            ):
+                with self.assertRaises(type(error)) as raised:
+                    feed(request, "missing-subscription-key")
+                self.assertIs(raised.exception, error)
+
+
 class FeedUserAgentTests(SimpleTestCase):
     def setUp(self):
         self.factory = RequestFactory()
