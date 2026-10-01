@@ -69,7 +69,7 @@ def feed(request, key):
 
     try:
         sub = Subscription.objects.get(key=key)
-    except Exception:
+    except Subscription.DoesNotExist:
         r = HttpResponse(
             "And like that, he's gone.", status=410
         )  # let's assume that a feed that doesn't exist has been deleted
