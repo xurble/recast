@@ -686,6 +686,31 @@ class CompletionFeedTests(TestCase):
         return [item for item in root.findall("./channel/item")
                 if item.findtext("title") == "Recast is complete"]
 
+    def test_initial_rss_response_includes_etag(self):
+        response = self.request_at(timedelta(days=1))
+
+        self.assertEqual(self.completion_items(response), [])
+        self.assertEqual(response["ETag"], f'"{self.subscription.pk}-1"')
+
+    def test_matching_etag_returns_not_modified(self):
+        first = self.request_at(timedelta(days=1))
+        response = self.request_at(
+            timedelta(days=1), HTTP_IF_NONE_MATCH=first["ETag"],
+        )
+
+        self.assertEqual(response.status_code, 304)
+        self.assertEqual(response.content, b"")
+
+    def test_stale_etag_returns_current_rss_and_new_etag(self):
+        first = self.request_at(timedelta(days=1))
+        response = self.request_at(
+            timedelta(days=3), HTTP_IF_NONE_MATCH=first["ETag"],
+        )
+
+        self.assertEqual(len(self.completion_items(response)), 1)
+        self.assertEqual(response["ETag"], f'"{self.subscription.pk}-2"')
+        self.assertNotEqual(response["ETag"], first["ETag"])
+
     def test_two_days_and_just_before_three_have_no_completion_item(self):
         for elapsed in (timedelta(days=2), timedelta(days=3, microseconds=-1)):
             with self.subTest(elapsed=elapsed):

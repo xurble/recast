@@ -181,6 +181,7 @@ def feed(request, key):
     r = render(request, "rss.xml", vals)
 
     r["Content-Type"] = "application/rss+xml"
+    r["ETag"] = return_etag
 
     sub.last_return_code = 200
     sub.save()
