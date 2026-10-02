@@ -23,6 +23,7 @@ from feeds.utils import update_feeds
 import CloudFlare
 
 import datetime
+import hashlib
 import uuid
 import email.utils
 from .models import Subscription
@@ -150,13 +151,6 @@ def feed(request, key):
 
                 return r
 
-    return_etag = '"%d-%d"' % (sub.id, last_sent)
-
-    if return_etag == browser_etag:
-        sub.last_return_code = 304
-        sub.save()
-        return HttpResponseNotModified()
-
     vals = {}
     vals["subscription"] = sub
     vals["source"] = sub.source
@@ -181,6 +175,14 @@ def feed(request, key):
     r = render(request, "rss.xml", vals)
 
     r["Content-Type"] = "application/rss+xml"
+    return_etag = '"%d-%s"' % (sub.id, hashlib.sha256(r.content).hexdigest())
+    if return_etag == browser_etag:
+        sub.last_return_code = 304
+        sub.save()
+        not_modified = HttpResponseNotModified()
+        not_modified["ETag"] = return_etag
+        return not_modified
+
     r["ETag"] = return_etag
 
     sub.last_return_code = 200
