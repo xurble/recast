@@ -181,6 +181,7 @@ def feed(request, key):
         sub.save()
         not_modified = HttpResponseNotModified()
         not_modified["ETag"] = return_etag
+        patch_response_headers(not_modified, cache_timeout=(60 * 60))
         return not_modified
 
     r["ETag"] = return_etag

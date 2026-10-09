@@ -700,6 +700,9 @@ class CompletionFeedTests(TestCase):
 
         self.assertEqual(response.status_code, 304)
         self.assertEqual(response.content, b"")
+        self.assertEqual(response["ETag"], first["ETag"])
+        self.assertEqual(response["Cache-Control"], first["Cache-Control"])
+        self.assertIn("Expires", response)
 
     def test_stale_etag_returns_current_rss_and_new_etag(self):
         first = self.request_at(timedelta(days=1))
