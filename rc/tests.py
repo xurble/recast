@@ -686,6 +686,48 @@ class CompletionFeedTests(TestCase):
         return [item for item in root.findall("./channel/item")
                 if item.findtext("title") == "Recast is complete"]
 
+    def test_initial_rss_response_includes_etag(self):
+        response = self.request_at(timedelta(days=1))
+
+        self.assertEqual(self.completion_items(response), [])
+        self.assertRegex(response["ETag"], rf'^"{self.subscription.pk}-[0-9a-f]{{64}}"$')
+
+    def test_matching_etag_returns_not_modified(self):
+        first = self.request_at(timedelta(days=1))
+        response = self.request_at(
+            timedelta(days=1), HTTP_IF_NONE_MATCH=first["ETag"],
+        )
+
+        self.assertEqual(response.status_code, 304)
+        self.assertEqual(response.content, b"")
+        self.assertEqual(response["ETag"], first["ETag"])
+        self.assertEqual(response["Cache-Control"], first["Cache-Control"])
+        self.assertIn("Expires", response)
+
+    def test_stale_etag_returns_current_rss_and_new_etag(self):
+        first = self.request_at(timedelta(days=1))
+        response = self.request_at(
+            timedelta(days=3), HTTP_IF_NONE_MATCH=first["ETag"],
+        )
+
+        self.assertEqual(len(self.completion_items(response)), 1)
+        self.assertNotEqual(response["ETag"], first["ETag"])
+        self.assertNotEqual(response.content, first.content)
+
+    def test_frequency_edit_invalidates_etag_when_rss_changes(self):
+        first = self.request_at(timedelta(days=1))
+        self.subscription.frequency = 6
+        self.subscription.save()
+
+        response = self.request_at(
+            timedelta(days=1), HTTP_IF_NONE_MATCH=first["ETag"],
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"every 6 days", response.content)
+        self.assertNotEqual(response.content, first.content)
+        self.assertNotEqual(response["ETag"], first["ETag"])
+
     def test_two_days_and_just_before_three_have_no_completion_item(self):
         for elapsed in (timedelta(days=2), timedelta(days=3, microseconds=-1)):
             with self.subTest(elapsed=elapsed):
@@ -708,19 +750,21 @@ class CompletionFeedTests(TestCase):
                 })
 
     def test_seven_days_returns_gone_even_with_previous_etag(self):
+        previous = self.request_at(timedelta(days=3))
         response = self.request_at(
             timedelta(days=7),
-            HTTP_IF_NONE_MATCH=f'"{self.subscription.pk}-2"',
+            HTTP_IF_NONE_MATCH=previous["ETag"],
         )
         self.assertEqual(response.status_code, 410)
 
     def test_completion_supports_conditional_requests(self):
+        previous = self.request_at(timedelta(days=1))
         complete = self.request_at(
-            timedelta(days=3), HTTP_IF_NONE_MATCH=f'"{self.subscription.pk}-1"',
+            timedelta(days=3), HTTP_IF_NONE_MATCH=previous["ETag"],
         )
         self.assertEqual(len(self.completion_items(complete)), 1)
         cached = self.request_at(
-            timedelta(days=6), HTTP_IF_NONE_MATCH=f'"{self.subscription.pk}-2"',
+            timedelta(days=6), HTTP_IF_NONE_MATCH=complete["ETag"],
         )
         self.assertEqual(cached.status_code, 304)
         self.assertEqual(cached.content, b"")
