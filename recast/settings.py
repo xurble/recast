@@ -123,8 +123,12 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "rc.middleware.PreviewMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # 'smart_cache_control.middleware.SmartCacheControlMiddleware',
 ]
+
+# No Recast page has an approved framing origin, including admin and feed tools.
+X_FRAME_OPTIONS = "DENY"
 
 ROOT_URLCONF = "recast.urls"
 

@@ -514,6 +514,37 @@ class HttpsSecurityTests(SimpleTestCase):
         self.assertTrue(response.cookies[settings.CSRF_COOKIE_NAME]["secure"])
 
 
+class ClickjackingProtectionTests(TestCase):
+    def setUp(self):
+        self.administrator = get_user_model().objects.create_superuser(
+            username="administrator", email="admin@example.com", password="password"
+        )
+        self.client.force_login(self.administrator)
+
+    def test_admin_page_denies_framing(self):
+        response = self.client.get(reverse("admin:index"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Frame-Options"], "DENY")
+
+    def test_operational_page_denies_framing(self):
+        response = self.client.get("/feedgarden/", secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Frame-Options"], "DENY")
+
+    def test_source_diagnostic_denies_framing(self):
+        source = Source.objects.create(
+            name="Test podcast", feed_url="https://example.com/feed.xml"
+        )
+        upstream = Mock(url=source.feed_url, text="Feed body")
+        with patch("rc.views.requests.get", return_value=upstream):
+            response = self.client.get(f"/source/{source.pk}/test/", secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["X-Frame-Options"], "DENY")
+
+
 @override_settings(DEBUG=False)
 class FeedLookupFailureTests(TestCase):
     def setUp(self):

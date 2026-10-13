@@ -321,6 +321,8 @@ Evidence: `django-feed-reader/feeds/models.py` and
 - Subscription keys function as bearer secrets and appear in URLs.
 - Feed Garden, source testing, and source revival require Django authentication.
 - Django admin uses Django's normal administration authentication and permissions.
+- No origin is permitted to frame Recast pages. Admin and authenticated feed
+  operations send `X-Frame-Options: DENY` through global middleware.
 - In production (`DEBUG=False`), Django redirects HTTP requests to HTTPS, marks
   session and CSRF cookies Secure, and sends a one-year HSTS policy on HTTPS
   responses. The policy does not include subdomains or request browser preload.
