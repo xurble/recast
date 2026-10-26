@@ -12,7 +12,7 @@ beautifulsoup4==4.15.0
     # via
     #   -r requirements.in
     #   django-feed-reader
-certifi==2026.7.22
+certifi==2026.10.19
     # via requests
 charset-normalizer==3.5.1
     # via requests
